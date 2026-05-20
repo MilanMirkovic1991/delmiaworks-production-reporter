@@ -1,0 +1,6 @@
+{
+  "data": [
+    { "Id": 1, "OrdDetailId": 11, "OrderNumber": "SO1001", "Company": "Acme", "PONumber": "PO-77", "TotalQTYOrdered": 500, "CummShipped": 100, "ArInvtId": 100, "Status": "Active", "EPlantId": 1 },
+    { "Id": 2, "OrdDetailId": 22, "OrderNumber": "SO1002", "Company": "Globex", "PONumber": "PO-88", "TotalQTYOrdered": 300, "CummShipped": 0, "ArInvtId": 100, "Status": "Active", "EPlantId": 1 }
+  ]
+}
