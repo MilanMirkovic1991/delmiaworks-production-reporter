@@ -1,0 +1,5 @@
+{
+  "data": [
+    { "ArInvtId": 300, "ItemNo": "STEEL", "Description": "Steel bar", "Rev": "A", "ItemClass": "BUY", "QtyRequired": 100, "Uom": "kg" }
+  ]
+}

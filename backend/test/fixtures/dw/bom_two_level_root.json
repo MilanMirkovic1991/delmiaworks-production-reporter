@@ -1,0 +1,6 @@
+{
+  "data": [
+    { "ArInvtId": 200, "ItemNo": "SUB", "Description": "Sub", "Rev": "A", "ItemClass": "MFG", "QtyRequired": 20, "Uom": "ea" },
+    { "ArInvtId": 201, "ItemNo": "NUT", "Description": "Nut", "Rev": "A", "ItemClass": "BUY", "QtyRequired": 40, "Uom": "ea" }
+  ]
+}
