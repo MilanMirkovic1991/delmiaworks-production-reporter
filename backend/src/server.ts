@@ -7,6 +7,8 @@ import { logger } from './logger.js';
 import { config } from './config.js';
 import { createSessionStore } from './session.js';
 import { makeAuthRouter } from './routes/auth.js';
+import { makeItemsRouter } from './routes/items.js';
+import { makeSalesOrdersRouter } from './routes/salesOrders.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 export function createApp(): Express {
@@ -20,6 +22,8 @@ export function createApp(): Express {
 
   app.get('/healthz', (_req, res) => { res.json({ status: 'ok' }); });
   app.use('/api/auth', makeAuthRouter(sessionStore));
+  app.use('/api/items', makeItemsRouter(sessionStore));
+  app.use('/api/sales-orders', makeSalesOrdersRouter(sessionStore));
 
   app.use(errorHandler);
   return app;
