@@ -1,4 +1,5 @@
 import { AxiosInstance } from 'axios';
+import { pickArray } from './shared.js';
 
 export type InventoryItem = {
   arInvtId: number;
@@ -26,13 +27,6 @@ function detectPurchased(itemClass: string | undefined): boolean {
   return PURCHASED_CLASSES.has(itemClass.toUpperCase());
 }
 
-function pickArray<T = unknown>(body: unknown): T[] {
-  if (Array.isArray(body)) return body as T[];
-  if (body && typeof body === 'object' && 'data' in body && Array.isArray((body as { data: unknown[] }).data)) {
-    return (body as { data: T[] }).data;
-  }
-  return [];
-}
 
 export function makeInventoryApi(http: AxiosInstance) {
   return {
