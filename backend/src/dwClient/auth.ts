@@ -1,12 +1,6 @@
 import { AxiosInstance } from 'axios';
-import { LoginInput, LoginResult, DwError } from './types.js';
-import { makeError } from './http.js';
-
-const DW_CODES = new Set<string>(['AUTH_FAILED', 'DW_UNREACHABLE', 'DW_ERROR', 'AUTH_EXPIRED']);
-
-function isDwError(e: unknown): e is DwError {
-  return e instanceof Error && 'code' in e && DW_CODES.has((e as DwError).code);
-}
+import { LoginInput, LoginResult } from './types.js';
+import { isDwError, makeError } from './http.js';
 
 export function makeAuthApi(http: AxiosInstance) {
   return {
