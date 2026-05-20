@@ -1,5 +1,6 @@
 import { createHttp } from './http.js';
 import { makeAuthApi } from './auth.js';
+import { makeInventoryApi } from './inventory.js';
 import { DwClientConfig } from './types.js';
 
 export function createDwClient(cfg: DwClientConfig) {
@@ -12,6 +13,7 @@ export function createDwClient(cfg: DwClientConfig) {
   return {
     setAuthToken(token: string) { authToken.value = token; },
     auth: makeAuthApi(http),
+    inventory: makeInventoryApi(http),
   };
 }
 

@@ -1,0 +1,6 @@
+{
+  "data": [
+    { "ArInvtId": 200, "ItemNo": "MAT-X", "Description": "Steel", "Rev": "A", "ItemClass": "BUY", "QtyRequired": 50, "Uom": "kg" },
+    { "ArInvtId": 201, "ItemNo": "SUB-Y", "Description": "Subassembly Y", "Rev": "B", "ItemClass": "MFG", "QtyRequired": 10, "Uom": "ea" }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "data": [
+    { "ID": 100, "ItemNo": "PART-A", "Description": "Widget A", "Rev": "1", "ItemClass": "MFG" },
+    { "ID": 101, "ItemNo": "PART-B", "Description": "Widget B", "Rev": "2", "ItemClass": "BUY" }
+  ]
+}
