@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import express, { Express } from 'express';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
@@ -19,7 +20,7 @@ export function createApp(): Express {
   return app;
 }
 
-const isMain = import.meta.url === `file://${process.argv[1]}`;
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
   const app = createApp();
   app.listen(config.port, () => {
