@@ -2,6 +2,7 @@ import { createHttp } from './http.js';
 import { makeAuthApi } from './auth.js';
 import { makeInventoryApi } from './inventory.js';
 import { makeSalesOrdersApi } from './salesOrders.js';
+import { makeBomApi } from './bom.js';
 import { DwClientConfig } from './types.js';
 
 export function createDwClient(cfg: DwClientConfig) {
@@ -16,6 +17,7 @@ export function createDwClient(cfg: DwClientConfig) {
     auth: makeAuthApi(http),
     inventory: makeInventoryApi(http),
     salesOrders: makeSalesOrdersApi(http),
+    bom: makeBomApi(http),
   };
 }
 
