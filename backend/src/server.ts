@@ -1,10 +1,13 @@
-import { fileURLToPath } from 'node:url';
 import express, { Express } from 'express';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import pinoHttp from 'pino-http';
+import { fileURLToPath } from 'node:url';
 import { logger } from './logger.js';
 import { config } from './config.js';
+import { createSessionStore } from './session.js';
+import { makeAuthRouter } from './routes/auth.js';
+import { errorHandler } from './middleware/errorHandler.js';
 
 export function createApp(): Express {
   const app = express();
@@ -13,10 +16,12 @@ export function createApp(): Express {
   app.use(express.json());
   app.use(cookieParser());
 
-  app.get('/healthz', (_req, res) => {
-    res.json({ status: 'ok' });
-  });
+  const sessionStore = createSessionStore({ ttlMs: config.sessionTtlMs });
 
+  app.get('/healthz', (_req, res) => { res.json({ status: 'ok' }); });
+  app.use('/api/auth', makeAuthRouter(sessionStore));
+
+  app.use(errorHandler);
   return app;
 }
 
