@@ -7,36 +7,43 @@ describe('wizardStore', () => {
   it('starts at step 1 with empty state', () => {
     const s = useWizardStore.getState();
     expect(s.step).toBe(1);
-    expect(s.selectedItem).toBeUndefined();
     expect(s.selectedSO).toBeUndefined();
+    expect(s.selectedLineItem).toBeUndefined();
     expect(s.selection.mode).toBe('full');
     expect(s.selection.releaseIds).toEqual([]);
     expect(s.finalQty).toBe(0);
   });
 
-  it('selectItem advances to step 2', () => {
-    useWizardStore.getState().selectItem({ arInvtId: 1, itemNumber: 'P', description: 'd' });
+  it('selectSO advances to step 2', () => {
+    useWizardStore.getState().selectSO({
+      salesOrderId: 42, orderNumber: 'SO1001', company: 'Acme', customerNumber: 'C001',
+    });
     expect(useWizardStore.getState().step).toBe(2);
-    expect(useWizardStore.getState().selectedItem?.arInvtId).toBe(1);
+    expect(useWizardStore.getState().selectedSO?.salesOrderId).toBe(42);
+    expect(useWizardStore.getState().selectedLineItem).toBeUndefined();
   });
 
-  it('selectSO advances to step 3', () => {
-    useWizardStore.getState().selectItem({ arInvtId: 1, itemNumber: 'P', description: 'd' });
-    useWizardStore.getState().selectSO({ ordDetailId: 11, orderNumber: 'SO1', totalOrdered: 500, cummShipped: 0 });
+  it('selectLineItem advances to step 3 and finalQty defaults to totalOrdered', () => {
+    useWizardStore.getState().selectSO({
+      salesOrderId: 42, orderNumber: 'SO1001', company: 'Acme', customerNumber: 'C001',
+    });
+    useWizardStore.getState().selectLineItem({
+      ordDetailId: 11, arInvtId: 1, itemNumber: 'PART-A', description: 'Widget',
+      totalOrdered: 500, cummShipped: 100, remaining: 400,
+    });
     expect(useWizardStore.getState().step).toBe(3);
-    expect(useWizardStore.getState().selectedSO?.ordDetailId).toBe(11);
-  });
-
-  it('setSelectionFull computes finalQty = totalOrdered', () => {
-    useWizardStore.getState().selectItem({ arInvtId: 1, itemNumber: 'P', description: 'd' });
-    useWizardStore.getState().selectSO({ ordDetailId: 11, orderNumber: 'SO1', totalOrdered: 500, cummShipped: 100 });
-    useWizardStore.getState().setSelectionFull();
+    expect(useWizardStore.getState().selectedLineItem?.ordDetailId).toBe(11);
     expect(useWizardStore.getState().finalQty).toBe(500);
   });
 
-  it('setSelectionReleases sums checked release qtys', () => {
-    useWizardStore.getState().selectItem({ arInvtId: 1, itemNumber: 'P', description: 'd' });
-    useWizardStore.getState().selectSO({ ordDetailId: 11, orderNumber: 'SO1', totalOrdered: 500, cummShipped: 0 });
+  it('setSelectionReleases sums qtys', () => {
+    useWizardStore.getState().selectSO({
+      salesOrderId: 42, orderNumber: 'SO1001', company: 'Acme', customerNumber: 'C001',
+    });
+    useWizardStore.getState().selectLineItem({
+      ordDetailId: 11, arInvtId: 1, itemNumber: 'PART-A', description: 'Widget',
+      totalOrdered: 500, cummShipped: 0, remaining: 500,
+    });
     useWizardStore.getState().setSelectionReleases({
       releaseIds: [901, 902],
       releases: [
@@ -48,10 +55,27 @@ describe('wizardStore', () => {
     expect(useWizardStore.getState().finalQty).toBe(350);
   });
 
-  it('reset returns to step 1 and clears state', () => {
-    useWizardStore.getState().selectItem({ arInvtId: 1, itemNumber: 'P', description: 'd' });
+  it('reset clears state', () => {
+    useWizardStore.getState().selectSO({
+      salesOrderId: 42, orderNumber: 'SO1001', company: 'Acme', customerNumber: 'C001',
+    });
     useWizardStore.getState().reset();
     expect(useWizardStore.getState().step).toBe(1);
-    expect(useWizardStore.getState().selectedItem).toBeUndefined();
+    expect(useWizardStore.getState().selectedSO).toBeUndefined();
+    expect(useWizardStore.getState().selectedLineItem).toBeUndefined();
+    expect(useWizardStore.getState().finalQty).toBe(0);
+  });
+
+  it('Puna količina = lineItem.totalOrdered', () => {
+    useWizardStore.getState().selectSO({
+      salesOrderId: 42, orderNumber: 'SO1001', company: 'Acme', customerNumber: 'C001',
+    });
+    useWizardStore.getState().selectLineItem({
+      ordDetailId: 11, arInvtId: 1, itemNumber: 'PART-A', description: 'Widget',
+      totalOrdered: 500, cummShipped: 100, remaining: 400,
+    });
+    useWizardStore.getState().setSelectionFull();
+    expect(useWizardStore.getState().finalQty).toBe(500);
+    expect(useWizardStore.getState().selection.mode).toBe('full');
   });
 });

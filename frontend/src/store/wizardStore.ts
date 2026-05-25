@@ -2,19 +2,24 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Release } from '../api/types.js';
 
-type SelectedItem = { arInvtId: number; itemNumber: string; description: string };
-type SelectedSO = { ordDetailId: number; orderNumber: string; totalOrdered: number; cummShipped: number };
+type SelectedSO = {
+  salesOrderId: number; orderNumber: string; company: string; customerNumber: string;
+};
+type SelectedLineItem = {
+  ordDetailId: number; arInvtId: number; itemNumber: string;
+  description: string; totalOrdered: number; cummShipped: number; remaining: number;
+};
 type Selection = { mode: 'full' | 'releases'; releaseIds: number[] };
 
 type WizardState = {
   step: 1 | 2 | 3 | 4;
-  selectedItem?: SelectedItem;
   selectedSO?: SelectedSO;
+  selectedLineItem?: SelectedLineItem;
   selection: Selection;
   finalQty: number;
   goTo: (s: 1 | 2 | 3 | 4) => void;
-  selectItem: (item: SelectedItem) => void;
   selectSO: (so: SelectedSO) => void;
+  selectLineItem: (item: SelectedLineItem) => void;
   setSelectionFull: () => void;
   setSelectionReleases: (input: { releaseIds: number[]; releases: Release[] }) => void;
   reset: () => void;
@@ -27,17 +32,23 @@ export const useWizardStore = create<WizardState>()(
     (set, get) => ({
       ...initial,
       goTo: (step) => set({ step }),
-      selectItem: (item) => set({ selectedItem: item, step: 2, selectedSO: undefined, finalQty: 0, selection: { mode: 'full', releaseIds: [] } }),
-      selectSO: (so) => set({ selectedSO: so, step: 3, selection: { mode: 'full', releaseIds: [] }, finalQty: 0 }),
+      selectSO: (so) => set({
+        selectedSO: so, step: 2,
+        selectedLineItem: undefined, selection: { mode: 'full', releaseIds: [] }, finalQty: 0,
+      }),
+      selectLineItem: (item) => set({
+        selectedLineItem: item, step: 3,
+        selection: { mode: 'full', releaseIds: [] }, finalQty: item.totalOrdered,
+      }),
       setSelectionFull: () => {
-        const so = get().selectedSO;
-        set({ selection: { mode: 'full', releaseIds: [] }, finalQty: so?.totalOrdered ?? 0 });
+        const lineItem = get().selectedLineItem;
+        set({ selection: { mode: 'full', releaseIds: [] }, finalQty: lineItem?.totalOrdered ?? 0 });
       },
       setSelectionReleases: ({ releaseIds, releases }) => {
         const sum = releases.filter(r => releaseIds.includes(r.releaseId)).reduce((acc, r) => acc + r.qty, 0);
         set({ selection: { mode: 'releases', releaseIds }, finalQty: sum });
       },
-      reset: () => set({ ...initial, selectedItem: undefined, selectedSO: undefined }),
+      reset: () => set({ ...initial, selectedSO: undefined, selectedLineItem: undefined }),
     }),
     { name: 'dw-reporter-wizard' },
   ),

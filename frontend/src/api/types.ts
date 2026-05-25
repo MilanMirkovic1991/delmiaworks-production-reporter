@@ -11,3 +11,22 @@ export type BomNode = {
   cycleDetected?: boolean; children: BomNode[];
 };
 export type BomTreeResponse = { tree: BomNode | null; reason?: 'NO_BOM'; stats: { nodeCount: number; maxDepth: number; cycleCount: number } };
+
+export type SalesOrderSummary = {
+  salesOrderId: number; orderNumber: string; customerNumber: string;
+  company: string; poNumber: string; dateTaken: string | null;
+  status: string; lineCount: number; totalOrdered: number;
+  totalShipped: number; totalRemaining: number;
+};
+
+export type SalesOrderLineItem = {
+  ordDetailId: number; arInvtId: number; itemNumber: string;
+  description: string; rev: string; itemClass: string;
+  totalOrdered: number; cummShipped: number; remaining: number; uom: string;
+};
+
+export type WorkOrderRow = {
+  workOrderId: number; mfgNumber: string; mfgDescrip: string;
+  arInvtId: number; eplantId: number;
+  priorityLevel: number | null; startDate: string | null; status: string;
+};

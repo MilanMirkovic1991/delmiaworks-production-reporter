@@ -18,8 +18,13 @@ vi.mock('../../src/api/client.js', () => ({
 }));
 
 function renderPage() {
-  useWizardStore.getState().selectItem({ arInvtId: 1, itemNumber: 'PART-A', description: 'd' });
-  useWizardStore.getState().selectSO({ ordDetailId: 11, orderNumber: 'SO1', totalOrdered: 500, cummShipped: 100 });
+  useWizardStore.getState().selectSO({
+    salesOrderId: 42, orderNumber: 'SO1', company: 'Acme', customerNumber: 'C001',
+  });
+  useWizardStore.getState().selectLineItem({
+    ordDetailId: 11, arInvtId: 1, itemNumber: 'PART-A', description: 'Widget',
+    totalOrdered: 500, cummShipped: 100, remaining: 400,
+  });
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>

@@ -1,4 +1,4 @@
-import type { Me, Item, SalesOrderRow, Release, BomTreeResponse } from './types.js';
+import type { Me, Item, SalesOrderRow, Release, BomTreeResponse, SalesOrderSummary, SalesOrderLineItem, WorkOrderRow } from './types.js';
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, { credentials: 'include', ...init });
@@ -21,4 +21,9 @@ export const api = {
   salesOrdersForItem: (arInvtId: number) => req<{ salesOrders: SalesOrderRow[] }>(`/api/items/${arInvtId}/sales-orders`),
   releasesForSO: (ordDetailId: number) => req<{ releases: Release[] }>(`/api/sales-orders/${ordDetailId}/releases`),
   bomTree: (itemId: number, qty: number) => req<BomTreeResponse>(`/api/bom-tree?itemId=${itemId}&qty=${qty}`),
+  listSalesOrders: () => req<{ salesOrders: SalesOrderSummary[] }>('/api/sales-orders'),
+  salesOrderLineItems: (salesOrderId: number) =>
+    req<{ lineItems: SalesOrderLineItem[] }>(`/api/sales-orders/${salesOrderId}/line-items`),
+  workOrdersForPart: (arInvtId: number) =>
+    req<{ workOrders: WorkOrderRow[] }>(`/api/work-orders?arInvtId=${arInvtId}`),
 };

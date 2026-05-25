@@ -1,6 +1,6 @@
 import { useWizardStore } from '../store/wizardStore.js';
 
-const labels = ['1. Artikal', '2. Sales Order', '3. Release', '4. BOM'];
+const labels = ['1. Sales Order', '2. Stavka', '3. Release', '4. Work Order'];
 
 export function WizardStepper() {
   const step = useWizardStore(s => s.step);

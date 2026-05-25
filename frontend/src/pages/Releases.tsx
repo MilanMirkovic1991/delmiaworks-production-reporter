@@ -7,22 +7,21 @@ import { WizardStepper } from '../components/WizardStepper.js';
 
 export function ReleasesPage() {
   const navigate = useNavigate();
-  const item = useWizardStore(s => s.selectedItem);
   const so = useWizardStore(s => s.selectedSO);
+  const lineItem = useWizardStore(s => s.selectedLineItem);
   const selection = useWizardStore(s => s.selection);
   const finalQty = useWizardStore(s => s.finalQty);
   const setFull = useWizardStore(s => s.setSelectionFull);
   const setReleases = useWizardStore(s => s.setSelectionReleases);
 
   useEffect(() => {
-    if (!item || !so) navigate('/');
-    else if (selection.mode === 'full' && finalQty === 0) setFull();
-  }, [item, so, selection.mode, finalQty, setFull, navigate]);
+    if (!so || !lineItem) navigate('/');
+  }, [so, lineItem, navigate]);
 
   const { data, isFetching } = useQuery({
-    queryKey: ['releases', so?.ordDetailId],
-    queryFn: () => api.releasesForSO(so!.ordDetailId),
-    enabled: !!so,
+    queryKey: ['releases', lineItem?.ordDetailId],
+    queryFn: () => api.releasesForSO(lineItem!.ordDetailId),
+    enabled: !!lineItem,
     staleTime: 60_000,
   });
 
@@ -36,16 +35,16 @@ export function ReleasesPage() {
     setReleases({ releaseIds: [...next], releases: data?.releases ?? [] });
   }
 
-  if (!item || !so) return null;
+  if (!so || !lineItem) return null;
 
   return (
     <div className="app">
       <WizardStepper />
-      <h2>Količina za {item.itemNumber} — {so.orderNumber}</h2>
+      <h2>Količina za {lineItem.itemNumber} — {so.orderNumber}</h2>
       <div className="card">
         <label>
           <input type="radio" name="mode" checked={selection.mode === 'full'} onChange={() => { setFull(); setChecked(new Set()); }} />
-          {' '}Puna količina ({so.totalOrdered})
+          {' '}Puna količina ({lineItem.totalOrdered})
         </label>
         <div style={{ marginTop: 8 }}>
           <label>
@@ -79,10 +78,10 @@ export function ReleasesPage() {
       </div>
 
       <div className="row" style={{ marginTop: 16 }}>
-        <button onClick={() => navigate('/sales-orders')}>← Nazad</button>
+        <button onClick={() => navigate('/sales-order/items')}>← Nazad</button>
         <button
           disabled={selection.mode === 'releases' && checked.size === 0}
-          onClick={() => { useWizardStore.getState().goTo(4); navigate('/bom'); }}
+          onClick={() => { useWizardStore.getState().goTo(4); navigate('/work-orders'); }}
         >Dalje →</button>
       </div>
     </div>
