@@ -11,6 +11,7 @@ import { makeItemsRouter } from './routes/items.js';
 import { makeSalesOrdersRouter } from './routes/salesOrders.js';
 import { makeWorkOrdersRouter } from './routes/workOrders.js';
 import { makeBomRouter } from './routes/bom.js';
+import { makeWorkOrderTreeRouter } from './routes/workOrderTree.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 export function createApp(): Express {
@@ -27,6 +28,7 @@ export function createApp(): Express {
   app.use('/api/items', makeItemsRouter(sessionStore));
   app.use('/api/sales-orders', makeSalesOrdersRouter(sessionStore));
   app.use('/api/work-orders', makeWorkOrdersRouter(sessionStore));
+  app.use('/api/work-order-tree', makeWorkOrderTreeRouter(sessionStore));
   app.use('/api/bom-tree', makeBomRouter(sessionStore));
 
   app.use(errorHandler);
