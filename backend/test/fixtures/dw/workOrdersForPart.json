@@ -1,0 +1,6 @@
+{
+  "data": [
+    { "Id": 501, "MfgNumber": "WO-501", "MfgDescrip": "Assembly run alpha", "StandardID": 100, "EplantID": 1, "PriorityLevel": 2, "StartDate": "2024-03-01", "Status": "Released" },
+    { "Id": 502, "MfgNumber": "WO-502", "MfgDescrip": "Assembly run beta",  "StandardID": 100, "EplantID": 99, "PriorityLevel": null, "StartDate": null, "Status": "Open" }
+  ]
+}

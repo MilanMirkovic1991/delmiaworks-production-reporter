@@ -1,0 +1,8 @@
+{
+  "data": [
+    { "Id": 10, "OrdDetailId": 11, "CustomerNumber": "CUST-01", "OrderNumber": "SO2001", "Company": "Acme Corp", "PONumber": "PO-101", "DateTaken": "2024-01-15", "Status": "Active", "EPlantId": 1, "ItemNumber": "PART-A", "Description": "Part Alpha", "Rev": "A", "ItemClass": "FG", "TotalQTYOrdered": 100, "CummShipped": 10, "UOM": "EA", "ArInvtId": 201 },
+    { "Id": 10, "OrdDetailId": 12, "CustomerNumber": "CUST-01", "OrderNumber": "SO2001", "Company": "Acme Corp", "PONumber": "PO-101", "DateTaken": "2024-01-15", "Status": "Active", "EPlantId": 1, "ItemNumber": "PART-B", "Description": "Part Beta",  "Rev": "B", "ItemClass": "FG", "TotalQTYOrdered": 200, "CummShipped": 50, "UOM": "EA", "ArInvtId": 202 },
+    { "Id": 20, "OrdDetailId": 21, "CustomerNumber": "CUST-02", "OrderNumber": "SO2002", "Company": "Globex", "PONumber": "PO-202", "DateTaken": "2024-02-20", "Status": "Active", "EPlantId": 1, "ItemNumber": "PART-C", "Description": "Part Gamma", "Rev": "",  "ItemClass": "FG", "TotalQTYOrdered": 50,  "CummShipped": 0,  "UOM": "EA", "ArInvtId": 203 },
+    { "Id": 10, "OrdDetailId": 13, "CustomerNumber": "CUST-01", "OrderNumber": "SO2001", "Company": "Acme Corp", "PONumber": "PO-101", "DateTaken": "2024-01-15", "Status": "Active", "EPlantId": 1, "ItemNumber": "PART-D", "Description": "Part Delta",  "Rev": "C", "ItemClass": "FG", "TotalQTYOrdered": 75,  "CummShipped": 25, "UOM": "EA", "ArInvtId": 204 }
+  ]
+}
