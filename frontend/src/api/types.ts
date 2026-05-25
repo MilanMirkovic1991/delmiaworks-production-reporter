@@ -30,3 +30,20 @@ export type WorkOrderRow = {
   arInvtId: number; eplantId: number;
   priorityLevel: number | null; startDate: string | null; status: string;
 };
+
+export type WorkOrderTreeNode = {
+  arInvtId: number; itemNumber: string; description: string; rev: string;
+  itemClass: string; isPurchased: boolean; qtyRequired: number; uom: string;
+  level: number; cycleDetected?: boolean;
+  workOrders: WorkOrderRow[];
+  children: WorkOrderTreeNode[];
+};
+export type WorkOrderTreeStats = {
+  nodeCount: number; maxDepth: number; cycleCount: number;
+  totalWorkOrders: number; itemsWithoutWO: number;
+};
+export type WorkOrderTreeResponse = {
+  tree: WorkOrderTreeNode | null;
+  reason?: 'NO_DATA';
+  stats: WorkOrderTreeStats;
+};

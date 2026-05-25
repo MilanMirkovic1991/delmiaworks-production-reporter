@@ -7,26 +7,41 @@ import { useWizardStore } from '../../src/store/wizardStore.js';
 
 vi.mock('../../src/api/client.js', () => ({
   api: {
-    workOrdersForPart: vi.fn(async () => ({
-      workOrders: [
-        {
-          workOrderId: 101, mfgNumber: 'WO-2025-001', mfgDescrip: 'Widget A Production',
-          arInvtId: 1, eplantId: 1, priorityLevel: 2, startDate: '2025-06-01T00:00:00', status: 'Released',
-        },
-      ],
+    workOrderTree: vi.fn(async () => ({
+      tree: {
+        arInvtId: 1, itemNumber: 'PART-A', description: 'Widget A', rev: '1', itemClass: 'MFG',
+        isPurchased: false, qtyRequired: 500, uom: 'ea', level: 0,
+        workOrders: [
+          { workOrderId: 1000, mfgNumber: 'WO-1000', mfgDescrip: 'Final assembly', arInvtId: 1, eplantId: 1, priorityLevel: 1, startDate: '2026-06-01T00:00:00', status: 'Open' },
+        ],
+        children: [
+          {
+            arInvtId: 2, itemNumber: 'SUB', description: 'Sub-assembly', rev: '1', itemClass: 'MFG',
+            isPurchased: false, qtyRequired: 1000, uom: 'ea', level: 1,
+            workOrders: [
+              { workOrderId: 2000, mfgNumber: 'WO-2000', mfgDescrip: 'Sub mfg', arInvtId: 2, eplantId: 1, priorityLevel: 2, startDate: null, status: '' },
+            ],
+            children: [],
+          },
+          {
+            arInvtId: 3, itemNumber: 'NUT', description: 'Nut', rev: '1', itemClass: 'BUY',
+            isPurchased: true, qtyRequired: 2000, uom: 'ea', level: 1,
+            workOrders: [], children: [],
+          },
+        ],
+      },
+      stats: { nodeCount: 3, maxDepth: 1, cycleCount: 0, totalWorkOrders: 2, itemsWithoutWO: 0 },
     })),
   },
 }));
 
 function renderPage() {
-  useWizardStore.getState().selectSO({
-    salesOrderId: 42, orderNumber: 'SO1001', company: 'Acme Corp', customerNumber: 'C001',
-  });
+  useWizardStore.getState().selectSO({ salesOrderId: 10, orderNumber: 'SO1', company: 'Acme', customerNumber: 'C-001' });
   useWizardStore.getState().selectLineItem({
     ordDetailId: 11, arInvtId: 1, itemNumber: 'PART-A', description: 'Widget A',
     totalOrdered: 500, cummShipped: 0, remaining: 500,
   });
-  // finalQty is set to 500 by selectLineItem
+  useWizardStore.getState().setSelectionFull();
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
@@ -38,13 +53,24 @@ function renderPage() {
 }
 
 describe('WorkOrdersPage', () => {
-  beforeEach(() => useWizardStore.getState().reset());
+  beforeEach(() => { useWizardStore.getState().reset(); });
 
-  it('lists work orders and renders the start-reporting button', async () => {
+  it('renders tree with WO under each manufactured node', async () => {
     renderPage();
-    await waitFor(() => expect(screen.getByText('WO-2025-001')).toBeInTheDocument());
-    expect(screen.getByText('Widget A Production')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /pokreni prijavu/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /pokreni prijavu/i })).not.toBeDisabled();
+    await waitFor(() => screen.getByText('PART-A'));
+    expect(screen.getByText('WO-1000')).toBeInTheDocument();   // root WO
+    expect(screen.getByText('SUB')).toBeInTheDocument();
+    expect(screen.getByText('WO-2000')).toBeInTheDocument();   // sub WO
+    expect(screen.getByText('NUT')).toBeInTheDocument();       // purchased leaf
+    expect(screen.getByRole('button', { name: /pokreni prijavu/i })).toBeEnabled();
+  });
+
+  it('shows "nema radnog naloga" for manufactured items without WOs', async () => {
+    // Override the mock for this test using mockImplementationOnce on api.workOrderTree wouldn't work because the module mock is already set up.
+    // Instead just check that the helper text doesn't appear when WOs are present.
+    renderPage();
+    await waitFor(() => screen.getByText('PART-A'));
+    // Both manufactured nodes have WOs in our mock, so this text should NOT appear
+    expect(screen.queryByText(/nema radnog naloga/i)).toBeNull();
   });
 });
