@@ -26,7 +26,8 @@ export function Login() {
 
   return (
     <div className="app auth-screen">
-      <h1>Prijava — DelmiaWorks</h1>
+      <h1>Prijava</h1>
+      <p style={{ color: 'var(--muted)', marginTop: -8 }}>Unesi pristupne podatke za DelmiaWorks server.</p>
       <form className="card auth-card" onSubmit={onSubmit}>
         <div className="row"><label style={{ width: 140 }}>DW Base URL</label>
           <input value={baseUrl} onChange={e => setBaseUrl(e.target.value)} style={{ flex: 1 }} required /></div>

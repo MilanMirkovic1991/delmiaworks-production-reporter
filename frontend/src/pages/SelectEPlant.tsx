@@ -24,12 +24,12 @@ export function SelectEPlant() {
   return (
     <div className="app auth-screen">
       <div className="card auth-card">
-        <h1>Izbor fabrike (EPlant)</h1>
+        <h1>Izbor fabrike</h1>
+        <p style={{ color: 'var(--muted)', marginTop: -8 }}>Odaberi fabriku (EPlant) za koju radiš prijavu proizvodnje.</p>
         {isFetching && <p>Učitavam listu fabrika...</p>}
         {error && <p className="error">{(error as Error).message}</p>}
         {data && (
           <>
-            <p style={{ color: 'var(--muted)' }}>Odaberi fabriku za koju želiš da radiš prijavu proizvodnje.</p>
             <div className="eplant-list">
               {data.eplants.map(p => (
                 <label key={p.id} className={`eplant-option${selected === p.id ? ' selected' : ''}`}>
