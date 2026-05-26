@@ -31,7 +31,11 @@ export function makePOApi(http: AxiosInstance) {
     async createPurchaseOrder(input: {
       vendorId: number;
       items: Array<{ arInvtId: number; quantity: number }>;
-      approverUsername: string;  // kept for signature compat; not used right now
+      /**
+       * PR_EMP badge number to use for ApprovedBy. Must reference a valid employee record
+       * (DW enforces FK_PO_REF_11839_PR_EMP). Defaults to '001' if empty.
+       */
+      approverBadge: string;
     }): Promise<CreatePOResult> {
       // 1. Create the PO header
       const createRes = await http.post(`/POReceiving/PO/CreatePO/0?vendorId=${input.vendorId}`, {});
@@ -99,13 +103,26 @@ export function makePOApi(http: AxiosInstance) {
       const successCount = lineResults.filter(l => l.success).length;
       logger.info({ poId, successCount, totalCount: lineResults.length }, 'PO line items + releases done');
 
-      // 3. Approval: SKIPPED.
-      // Setting ApprovedBy via UpdatePO requires a valid PR_EMP employee record (FK_PO_REF_11839_PR_EMP).
-      // The session username (e.g. "IQMS") is a login, not an employee, and DW rejects it with ORA-02291.
-      // Until we know a valid approver employee ID for the install, leave the PO as a 'requisition' and
-      // let the user approve it manually inside DelmiaWorks.
-      const approved = false;
-      const approvalError = 'Auto-approval skipped: DW ApprovedBy field is a FK to PR_EMP and requires a valid employee record. Please approve this PO manually in DelmiaWorks.';
+      // 3. Approval: GET PO body, set ApprovedBy (= valid PR_EMP badge), POST UpdatePO.
+      // The badge must reference a real employee or DW rejects with ORA-02291 on FK_PO_REF_11839_PR_EMP.
+      const badge = (input.approverBadge ?? '').trim() || '001';
+      let approved = false;
+      let approvalError: string | undefined;
+      try {
+        const getRes = await http.get(`/POReceiving/PO/PO/${poId}`);
+        const poBody = getRes.data?.data ?? getRes.data;
+        if (poBody && typeof poBody === 'object') {
+          const updated = { ...poBody, ApprovedBy: badge };
+          await http.post(`/POReceiving/PO/UpdatePO/${poId}`, updated);
+          approved = true;
+          logger.info({ poId, approverBadge: badge }, 'PO approved');
+        } else {
+          approvalError = `GET PO/${poId} returned no body`;
+        }
+      } catch (e: unknown) {
+        approvalError = (e && typeof e === 'object' && 'message' in e) ? String((e as { message: unknown }).message) : 'unknown';
+        logger.error({ poId, approvalError, approverBadge: badge }, 'PO approval failed — leaving as requisition');
+      }
 
       return { poId, poNo, approved, approvalError, lineItems: lineResults };
     },

@@ -133,7 +133,11 @@ export function WorkOrdersPage() {
                         {createPOMutation.data.poNo ? ` (${createPOMutation.data.poNo})` : ''}
                         {createPOMutation.data.approved
                           ? ' · ✓ Approved'
-                          : <span style={{ color: 'var(--warning)' }}> · ⚠ Status: REKVIZICIJA (odobriti ručno u DelmiaWorks)</span>}
+                          : <span style={{ color: 'var(--warning)' }}>
+                              {' · ⚠ Auto-odobrenje nije uspelo'}
+                              {createPOMutation.data.approvalError ? ` (${createPOMutation.data.approvalError})` : ''}
+                              {' — odobriti ručno u DelmiaWorks-u.'}
+                            </span>}
                         <br />
                         Stavki uspešno: {createPOMutation.data.lineItems.filter(l => l.success).length} / {createPOMutation.data.lineItems.length}
                         {createPOMutation.data.lineItems.some(l => !l.success) && (

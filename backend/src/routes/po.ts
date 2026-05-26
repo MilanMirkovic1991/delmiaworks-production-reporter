@@ -4,6 +4,7 @@ import { makeRequireSession } from '../middleware/requireSession.js';
 import { logger } from '../logger.js';
 
 const DEFAULT_VENDOR_ID = 61465;
+const DEFAULT_APPROVER_BADGE = (process.env.DW_APPROVER_BADGE ?? '001').trim() || '001';
 
 export function makePORouter(store: SessionStore) {
   const router = Router();
@@ -27,11 +28,11 @@ export function makePORouter(store: SessionStore) {
         res.status(400).json({ error: 'NO_VALID_ITEMS' });
         return;
       }
-      logger.info({ vendorId, itemCount: cleanItems.length }, 'Creating PO');
+      logger.info({ vendorId, itemCount: cleanItems.length, approverBadge: DEFAULT_APPROVER_BADGE }, 'Creating PO');
       const result = await req.dw!.po.createPurchaseOrder({
         vendorId,
         items: cleanItems,
-        approverUsername: req.session!.username,
+        approverBadge: DEFAULT_APPROVER_BADGE,
       });
       logger.info({
         poId: result.poId,
