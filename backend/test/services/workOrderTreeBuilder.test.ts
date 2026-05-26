@@ -21,9 +21,10 @@ describe('workOrderTreeBuilder', () => {
   it('single purchased root: tree has 1 node, no WOs, no children', async () => {
     const getComponents = vi.fn().mockResolvedValue([]);
     const getWorkOrders = vi.fn().mockResolvedValue([]);
+    const getInventoryItem = vi.fn().mockResolvedValue(null);
     const tree = await buildWorkOrderTree({
       rootArInvtId: 1, rootItemNumber: 'BOLT', rootDescription: 'Bolt', rootRev: '1', rootItemClass: 'BUY',
-      qty: 5, getComponents, getWorkOrders,
+      qty: 5, getComponents, getWorkOrders, getInventoryItem,
     });
     // Purchased root with no WOs => null (no data)
     expect(tree).toBeNull();
@@ -33,9 +34,10 @@ describe('workOrderTreeBuilder', () => {
   it('manufactured root with no children but has WOs => tree with root + WOs, empty children', async () => {
     const getComponents = vi.fn().mockResolvedValue([]);
     const getWorkOrders = vi.fn().mockResolvedValue([wo(501, 1)]);
+    const getInventoryItem = vi.fn().mockResolvedValue(null);
     const tree = await buildWorkOrderTree({
       rootArInvtId: 1, rootItemNumber: 'TOP', rootDescription: 'Top', rootRev: '1', rootItemClass: 'MFG',
-      qty: 10, getComponents, getWorkOrders,
+      qty: 10, getComponents, getWorkOrders, getInventoryItem,
     });
     expect(tree).not.toBeNull();
     expect(tree!.workOrders).toHaveLength(1);
@@ -54,9 +56,10 @@ describe('workOrderTreeBuilder', () => {
       if (arInvtId === 2) return [wo(503, 2)];
       return [];
     });
+    const getInventoryItem = vi.fn().mockResolvedValue(null);
     const tree = await buildWorkOrderTree({
       rootArInvtId: 1, rootItemNumber: 'TOP', rootDescription: 'Top', rootRev: '1', rootItemClass: 'MFG',
-      qty: 10, getComponents, getWorkOrders,
+      qty: 10, getComponents, getWorkOrders, getInventoryItem,
     });
     expect(tree).not.toBeNull();
     expect(tree!.workOrders).toHaveLength(2);
@@ -80,9 +83,10 @@ describe('workOrderTreeBuilder', () => {
       return [];
     });
     const getWorkOrders = vi.fn().mockResolvedValue([wo(501, 1)]);
+    const getInventoryItem = vi.fn().mockResolvedValue(null);
     const tree = await buildWorkOrderTree({
       rootArInvtId: 1, rootItemNumber: 'A', rootDescription: 'a', rootRev: '1', rootItemClass: 'MFG',
-      qty: 1, getComponents, getWorkOrders,
+      qty: 1, getComponents, getWorkOrders, getInventoryItem,
     });
     expect(tree).not.toBeNull();
     const b = tree!.children[0];
@@ -106,9 +110,10 @@ describe('workOrderTreeBuilder', () => {
       await new Promise(r => setTimeout(r, 5));
       return [wo(500 + arInvtId, arInvtId)];
     });
+    const getInventoryItem = vi.fn().mockResolvedValue(null);
     await buildWorkOrderTree({
       rootArInvtId: 1, rootItemNumber: 'A', rootDescription: 'a', rootRev: '1', rootItemClass: 'MFG',
-      qty: 1, getComponents, getWorkOrders,
+      qty: 1, getComponents, getWorkOrders, getInventoryItem,
     });
     // WO fetch for root (1) should be initiated in parallel with the BOM children expansion
     expect(calls).toContain('bom:1');
@@ -130,9 +135,10 @@ describe('workOrderTreeBuilder', () => {
       if (arInvtId === 4) return [wo(502, 4), wo(503, 4)];
       return [];
     });
+    const getInventoryItem = vi.fn().mockResolvedValue(null);
     const { tree, stats } = await buildWorkOrderTreeWithStats({
       rootArInvtId: 1, rootItemNumber: 'A', rootDescription: 'a', rootRev: '1', rootItemClass: 'MFG',
-      qty: 1, getComponents, getWorkOrders,
+      qty: 1, getComponents, getWorkOrders, getInventoryItem,
     });
     expect(tree).not.toBeNull();
     // nodes: root(1) + B(2) + C(3) + D(4) = 4
@@ -144,5 +150,57 @@ describe('workOrderTreeBuilder', () => {
     expect(stats.totalWorkOrders).toBe(3);
     // Manufactured with no WO: B(2) has 0 WOs => count 1
     expect(stats.itemsWithoutWO).toBe(1);
+  });
+
+  it('enriches tree nodes with ARINVT data when getInventoryItem returns data', async () => {
+    const getComponents = vi.fn().mockImplementation(async ({ arInvtId }: { arInvtId: number; qty: number }) => {
+      if (arInvtId === 1) return [comp(2, 'SUB', 5, false)];
+      return [];
+    });
+    const getWorkOrders = vi.fn().mockResolvedValue([]);
+    const getInventoryItem = vi.fn().mockImplementation(async (id: number) => {
+      if (id === 1) return { arInvtId: 1, itemNumber: 'TOP-FROM-ARINVT', description: 'Top from ARINVT', rev: 'X', itemClass: 'MFG', isPurchased: false };
+      if (id === 2) return { arInvtId: 2, itemNumber: 'SUB-FROM-ARINVT', description: 'Sub from ARINVT', rev: 'Y', itemClass: 'BUY', isPurchased: true };
+      return null;
+    });
+
+    // Need a tree that exists: give root a WO so it doesn't return null
+    const getWorkOrdersWithRoot = vi.fn().mockImplementation(async ({ arInvtId }: { arInvtId: number }) => {
+      if (arInvtId === 1) return [wo(501, 1)];
+      return [];
+    });
+
+    const tree = await buildWorkOrderTree({
+      rootArInvtId: 1, rootItemNumber: 'TOP', rootDescription: 'orig', rootRev: '', rootItemClass: 'MFG', qty: 1,
+      getComponents, getWorkOrders: getWorkOrdersWithRoot, getInventoryItem,
+    });
+    expect(tree).not.toBeNull();
+    // Root was originally itemNumber 'TOP', description 'orig'; ARINVT enrichment overrides
+    expect(tree!.itemNumber).toBe('TOP-FROM-ARINVT');
+    expect(tree!.description).toBe('Top from ARINVT');
+    expect(tree!.rev).toBe('X');
+    expect(tree!.itemClass).toBe('MFG');
+    expect(tree!.isPurchased).toBe(false);
+    // Sub node enrichment
+    const sub = tree!.children[0];
+    expect(sub.itemNumber).toBe('SUB-FROM-ARINVT');
+    expect(sub.itemClass).toBe('BUY');
+    expect(sub.isPurchased).toBe(true);
+  });
+
+  it('preserves original data when getInventoryItem returns null', async () => {
+    const getComponents = vi.fn().mockResolvedValue([]);
+    const getWorkOrders = vi.fn().mockResolvedValue([wo(501, 1)]);
+    const getInventoryItem = vi.fn().mockResolvedValue(null);
+
+    const tree = await buildWorkOrderTree({
+      rootArInvtId: 1, rootItemNumber: 'KEEP-THIS', rootDescription: 'keep desc', rootRev: 'A', rootItemClass: 'MFG', qty: 1,
+      getComponents, getWorkOrders, getInventoryItem,
+    });
+    expect(tree).not.toBeNull();
+    expect(tree!.itemNumber).toBe('KEEP-THIS');
+    expect(tree!.description).toBe('keep desc');
+    expect(tree!.rev).toBe('A');
+    expect(tree!.itemClass).toBe('MFG');
   });
 });

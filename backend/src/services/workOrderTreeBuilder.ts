@@ -1,4 +1,5 @@
 import type { WorkOrderRow } from '../dwClient/workOrders.js';
+import type { InventoryItem } from '../dwClient/inventory.js';
 
 export type WorkOrderTreeNode = {
   arInvtId: number;
@@ -32,6 +33,7 @@ export type BuildWoTreeInput = {
   qty: number;
   getComponents: (input: { arInvtId: number; qty: number }) => Promise<import('../dwClient/bom.js').BomComponent[]>;
   getWorkOrders: (input: { arInvtId: number }) => Promise<WorkOrderRow[]>;
+  getInventoryItem: (arInvtId: number) => Promise<InventoryItem | null>;
 };
 
 async function expand(
@@ -94,6 +96,42 @@ async function expand(
   };
 }
 
+async function enrichTree(
+  tree: WorkOrderTreeNode,
+  getInventoryItem: (arInvtId: number) => Promise<InventoryItem | null>,
+): Promise<void> {
+  // Collect unique IDs
+  const uniqueIds = new Set<number>();
+  (function collect(n: WorkOrderTreeNode) {
+    uniqueIds.add(n.arInvtId);
+    for (const c of n.children) collect(c);
+  })(tree);
+
+  // Fetch all in parallel (one fetch per unique ID)
+  const itemMap = new Map<number, InventoryItem>();
+  await Promise.all([...uniqueIds].map(async (id) => {
+    try {
+      const item = await getInventoryItem(id);
+      if (item) itemMap.set(id, item);
+    } catch {
+      // best-effort: if a single ARINVT lookup fails, keep the original data
+    }
+  }));
+
+  // Overwrite fields — only if ARINVT returned a non-empty value
+  (function enrich(n: WorkOrderTreeNode) {
+    const item = itemMap.get(n.arInvtId);
+    if (item) {
+      if (item.itemNumber) n.itemNumber = item.itemNumber;
+      if (item.description) n.description = item.description;
+      if (item.rev) n.rev = item.rev;
+      if (item.itemClass) n.itemClass = item.itemClass;
+      n.isPurchased = item.isPurchased;
+    }
+    for (const c of n.children) enrich(c);
+  })(tree);
+}
+
 export async function buildWorkOrderTreeWithStats(
   input: BuildWoTreeInput,
 ): Promise<{ tree: WorkOrderTreeNode | null; stats: WorkOrderTreeStats }> {
@@ -126,6 +164,7 @@ export async function buildWorkOrderTreeWithStats(
       workOrders: rootWOs,
       children: [],
     };
+    await enrichTree(tree, input.getInventoryItem);
     return { tree, stats };
   }
 
@@ -168,6 +207,8 @@ export async function buildWorkOrderTreeWithStats(
   };
 
   if (stats.maxDepth < 1 && children.length > 0) stats.maxDepth = 1;
+
+  await enrichTree(tree, input.getInventoryItem);
 
   return { tree, stats };
 }

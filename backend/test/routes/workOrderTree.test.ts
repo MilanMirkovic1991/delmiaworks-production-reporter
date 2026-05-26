@@ -42,10 +42,12 @@ describe('GET /api/work-order-tree', () => {
     const app = createApp();
     const cookies = await login(app);
 
-    // Root item lookup
-    nock(BASE).get('/Manufacturing/Inventory/InventoryItem/100').reply(200, {
+    // Root item lookup (also used during enrichment pass for arInvtId=100)
+    nock(BASE).get('/Manufacturing/Inventory/InventoryItem/100').twice().reply(200, {
       ID: 100, ItemNo: 'PART-A', Description: 'Widget A', Rev: '1', ItemClass: 'MFG'
     });
+    // Enrichment pass: child items (200, 201, 300) return 404 => no enrichment, original data preserved
+    nock(BASE).persist().get(/\/Manufacturing\/Inventory\/InventoryItem\/\d+/).reply(404, 'not found');
 
     // BOM: root (arInvtId=100) has SUB(200, MFG) + NUT(201, BUY)
     nock(BASE).get('/Manufacturing/Inventory/MaterialsForItem/0')

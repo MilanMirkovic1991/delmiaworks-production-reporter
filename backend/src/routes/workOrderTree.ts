@@ -28,6 +28,7 @@ export function makeWorkOrderTreeRouter(store: SessionStore) {
         qty,
         getComponents: ({ arInvtId, qty }) => dw.bom.getComponentsForQty({ arInvtId, qty }),
         getWorkOrders: ({ arInvtId }) => dw.workOrders.findForPart({ arInvtId, eplantId }),
+        getInventoryItem: (arInvtId) => dw.inventory.getById(arInvtId),
       });
       logger.info({ stats, itemId, qty }, 'Work order tree built');
       if (!tree) { res.json({ tree: null, reason: 'NO_DATA', stats }); return; }
