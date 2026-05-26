@@ -84,10 +84,16 @@ async function expand(
   }
 
   const children = await Promise.all(
-    childComps.map(c => expand(
-      c.arInvtId, c.itemNumber, c.description, c.rev, c.itemClass, c.isPurchased,
-      c.qtyRequired, c.uom, level + 1, newAncestors, getComponents, getWorkOrders, stats,
-    )),
+    childComps.map(c => {
+      // Canonical BOM formula: ptsPer * parent_qty. Fall back to DW's pre-computed
+      // Qty (qtyRequired) only when PtsPer is missing/zero. This avoids the
+      // 'Qty=0 cascade' seen when DW returns 0 for Qty even with non-zero parent.
+      const effectiveQty = c.ptsPer > 0 ? c.ptsPer * qty : c.qtyRequired;
+      return expand(
+        c.arInvtId, c.itemNumber, c.description, c.rev, c.itemClass, c.isPurchased,
+        effectiveQty, c.uom, level + 1, newAncestors, getComponents, getWorkOrders, stats,
+      );
+    }),
   );
 
   return {
@@ -186,10 +192,14 @@ export async function buildWorkOrderTreeWithStats(
   }
 
   const children = await Promise.all(
-    rootChildren.map(c => expand(
-      c.arInvtId, c.itemNumber, c.description, c.rev, c.itemClass, c.isPurchased,
-      c.qtyRequired, c.uom, 1, ancestors, input.getComponents, input.getWorkOrders, stats,
-    )),
+    rootChildren.map(c => {
+      // Canonical BOM formula: ptsPer * parent_qty. See expand() for rationale.
+      const effectiveQty = c.ptsPer > 0 ? c.ptsPer * input.qty : c.qtyRequired;
+      return expand(
+        c.arInvtId, c.itemNumber, c.description, c.rev, c.itemClass, c.isPurchased,
+        effectiveQty, c.uom, 1, ancestors, input.getComponents, input.getWorkOrders, stats,
+      );
+    }),
   );
 
   const tree: WorkOrderTreeNode = {

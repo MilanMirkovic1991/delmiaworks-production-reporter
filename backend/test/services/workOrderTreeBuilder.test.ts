@@ -6,7 +6,7 @@ import type { WorkOrderRow } from '../../src/dwClient/workOrders.js';
 function comp(arInvtId: number, itemNumber: string, qty: number, purchased: boolean): BomComponent {
   return {
     arInvtId, itemNumber, description: `Desc ${itemNumber}`, rev: '1',
-    itemClass: purchased ? 'BUY' : 'MFG', isPurchased: purchased, qtyRequired: qty, uom: 'ea',
+    itemClass: purchased ? 'BUY' : 'MFG', isPurchased: purchased, qtyRequired: qty, ptsPer: 0, uom: 'ea',
   };
 }
 

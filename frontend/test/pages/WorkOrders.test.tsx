@@ -58,11 +58,11 @@ describe('WorkOrdersPage', () => {
   it('renders tree with WO under each manufactured node', async () => {
     renderPage();
     await waitFor(() => screen.getByText('PART-A'));
-    // WO numbers appear as "WO WO-1000" in the new design (wo-num span prefixed)
     expect(screen.getByText(/WO-1000/)).toBeInTheDocument();   // root WO
     expect(screen.getByText('SUB')).toBeInTheDocument();
     expect(screen.getByText(/WO-2000/)).toBeInTheDocument();   // sub WO
-    expect(screen.getByText('NUT')).toBeInTheDocument();       // purchased leaf
+    // NUT now appears twice: once in the tree (purchased leaf) and once in the inline Purchase table
+    expect(screen.getAllByText('NUT').length).toBeGreaterThanOrEqual(1);
     // Per-WO "Prijavi" buttons (one per WO in the mock = 2)
     const buttons = screen.getAllByRole('button', { name: /pokreni prijavu/i });
     expect(buttons).toHaveLength(2);
@@ -74,5 +74,15 @@ describe('WorkOrdersPage', () => {
     await waitFor(() => screen.getByText('PART-A'));
     // Both manufactured nodes have WOs in our mock, so this text should NOT appear
     expect(screen.queryByText(/nema radnog naloga/i)).toBeNull();
+  });
+
+  it('renders inline Purchase section with the purchased leaf', async () => {
+    renderPage();
+    await waitFor(() => screen.getByText('PART-A'));
+    // The new inline section heading
+    expect(screen.getByRole('heading', { name: /kupovne komponente za nabavku/i })).toBeInTheDocument();
+    // The Create PO and Receive buttons exist (initially disabled because nothing is selected)
+    expect(screen.getByRole('button', { name: /kreiraj po/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /prijem na default/i })).toBeInTheDocument();
   });
 });

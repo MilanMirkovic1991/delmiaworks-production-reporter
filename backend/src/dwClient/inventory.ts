@@ -19,6 +19,7 @@ export type BomMaterial = {
   itemClass: string;
   isPurchased: boolean;
   qtyRequired: number;
+  ptsPer: number;
   uom: string;
 };
 
@@ -117,6 +118,7 @@ export function makeInventoryApi(http: AxiosInstance) {
             itemClass: String(cls ?? ''),
             isPurchased: detectPurchased(cls),
             qtyRequired: Number(r.Qty ?? r.QtyRequired ?? 0),
+            ptsPer: Number(r.PtsPer ?? 0),
             uom: String(r.Unit ?? r.Uom ?? (r as Record<string, unknown>).UOM ?? ''),
           };
         })
