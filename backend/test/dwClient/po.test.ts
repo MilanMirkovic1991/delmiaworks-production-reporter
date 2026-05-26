@@ -8,19 +8,17 @@ describe('dwClient.po', () => {
   beforeEach(() => nock.disableNetConnect());
   afterEach(() => { nock.cleanAll(); nock.enableNetConnect(); });
 
-  it('createPurchaseOrder posts header, line items, releases, then approves', async () => {
+  it('createPurchaseOrder posts header then sequentially creates line items + releases (no approval)', async () => {
     nock(BASE).post('/POReceiving/PO/CreatePO/0').query({ vendorId: '61465' })
       .reply(200, { data: { Id: 999, PONo: 'PO-TEST-1' } });
-    nock(BASE).post('/POReceiving/PO/CreatePOLineItem/0').query(true)
+    nock(BASE).post('/POReceiving/PO/CreatePOLineItem/0').query(q => Number(q.arinvtId) === 100)
       .reply(200, { data: { Id: 5001 } });
-    nock(BASE).post('/POReceiving/PO/CreatePOLineItem/0').query(true)
-      .reply(200, { data: { Id: 5002 } });
-    nock(BASE).post('/POReceiving/PO/CreatePOReleaseItem/0').query(true)
+    nock(BASE).post('/POReceiving/PO/CreatePOReleaseItem/0').query(q => Number(q.poDetailId) === 5001)
       .reply(200, { data: { Id: 7001 } });
-    nock(BASE).post('/POReceiving/PO/CreatePOReleaseItem/0').query(true)
+    nock(BASE).post('/POReceiving/PO/CreatePOLineItem/0').query(q => Number(q.arinvtId) === 101)
+      .reply(200, { data: { Id: 5002 } });
+    nock(BASE).post('/POReceiving/PO/CreatePOReleaseItem/0').query(q => Number(q.poDetailId) === 5002)
       .reply(200, { data: { Id: 7002 } });
-    nock(BASE).get('/POReceiving/PO/PO/999').reply(200, { data: { Id: 999, PONo: 'PO-TEST-1', ApprovedBy: '' } });
-    nock(BASE).post('/POReceiving/PO/UpdatePO/999').reply(200, { data: {} });
 
     const client = createDwClient({ baseUrl: BASE });
     client.setAuthToken('t');
@@ -31,11 +29,14 @@ describe('dwClient.po', () => {
     });
     expect(result.poId).toBe(999);
     expect(result.poNo).toBe('PO-TEST-1');
-    expect(result.approved).toBe(true);
+    expect(result.approved).toBe(false);
+    expect(result.approvalError).toMatch(/manually/i);
     expect(result.lineItems).toHaveLength(2);
     expect(result.lineItems.every(l => l.success)).toBe(true);
-    expect(result.lineItems[0]!.poDetailId).toBeGreaterThan(0);
-    expect(result.lineItems[0]!.releaseId).toBeGreaterThan(0);
+    expect(result.lineItems[0]!.poDetailId).toBe(5001);
+    expect(result.lineItems[0]!.releaseId).toBe(7001);
+    expect(result.lineItems[1]!.poDetailId).toBe(5002);
+    expect(result.lineItems[1]!.releaseId).toBe(7002);
   });
 
   it('reports line-item failures but still returns the PO', async () => {
@@ -43,8 +44,6 @@ describe('dwClient.po', () => {
       .reply(200, { data: { Id: 1000, PONo: 'PO-TEST-2' } });
     nock(BASE).post('/POReceiving/PO/CreatePOLineItem/0').query(true)
       .reply(500, 'bad');
-    nock(BASE).get('/POReceiving/PO/PO/1000').reply(200, { data: { Id: 1000 } });
-    nock(BASE).post('/POReceiving/PO/UpdatePO/1000').reply(200, { data: {} });
 
     const client = createDwClient({ baseUrl: BASE });
     client.setAuthToken('t');
@@ -54,6 +53,7 @@ describe('dwClient.po', () => {
       approverUsername: 'IQMS',
     });
     expect(result.poId).toBe(1000);
+    expect(result.approved).toBe(false);
     expect(result.lineItems[0]!.success).toBe(false);
     expect(result.lineItems[0]!.error).toBeTruthy();
   });
@@ -65,8 +65,6 @@ describe('dwClient.po', () => {
       .reply(200, { data: { Id: 5050 } });
     nock(BASE).post('/POReceiving/PO/CreatePOReleaseItem/0').query(true)
       .reply(500, 'release failed');
-    nock(BASE).get('/POReceiving/PO/PO/1001').reply(200, { data: { Id: 1001 } });
-    nock(BASE).post('/POReceiving/PO/UpdatePO/1001').reply(200, { data: {} });
 
     const client = createDwClient({ baseUrl: BASE });
     client.setAuthToken('t');
@@ -76,6 +74,7 @@ describe('dwClient.po', () => {
       approverUsername: 'IQMS',
     });
     expect(result.poId).toBe(1001);
+    expect(result.approved).toBe(false);
     expect(result.lineItems[0]!.success).toBe(false);
     expect(result.lineItems[0]!.poDetailId).toBe(5050);
     expect(result.lineItems[0]!.error).toMatch(/CreatePOReleaseItem threw/);
@@ -99,8 +98,6 @@ describe('dwClient.po', () => {
       .reply(200, { data: { Id: 5050 } });
     nock(BASE).post('/POReceiving/PO/CreatePOReleaseItem/0').query(true)
       .reply(200, { data: { something: 'unexpected' } });   // 200 but no Id
-    nock(BASE).get('/POReceiving/PO/PO/1000').reply(200, { data: { Id: 1000 } });
-    nock(BASE).post('/POReceiving/PO/UpdatePO/1000').reply(200, { data: {} });
 
     const client = createDwClient({ baseUrl: BASE });
     client.setAuthToken('t');
@@ -110,21 +107,19 @@ describe('dwClient.po', () => {
       approverUsername: 'IQMS',
     });
     expect(result.poId).toBe(1000);
-    expect(result.approved).toBe(true);
+    expect(result.approved).toBe(false);
     expect(result.lineItems[0]!.success).toBe(false);
     expect(result.lineItems[0]!.poDetailId).toBe(5050);
     expect(result.lineItems[0]!.error).toMatch(/no Id/);
   });
 
-  it('reports approvalError when UpdatePO fails', async () => {
+  it('returns approved=false with informative approvalError on every successful PO creation', async () => {
     nock(BASE).post('/POReceiving/PO/CreatePO/0').query({ vendorId: '61465' })
       .reply(200, { data: { Id: 2000, PONo: 'PO-Y' } });
     nock(BASE).post('/POReceiving/PO/CreatePOLineItem/0').query(true)
       .reply(200, { data: { Id: 6001 } });
     nock(BASE).post('/POReceiving/PO/CreatePOReleaseItem/0').query(true)
       .reply(200, { data: { Id: 8001 } });
-    nock(BASE).get('/POReceiving/PO/PO/2000').reply(200, { data: { Id: 2000 } });
-    nock(BASE).post('/POReceiving/PO/UpdatePO/2000').reply(500, 'approval failed');
 
     const client = createDwClient({ baseUrl: BASE });
     client.setAuthToken('t');
@@ -135,7 +130,7 @@ describe('dwClient.po', () => {
     });
     expect(result.poId).toBe(2000);
     expect(result.approved).toBe(false);
-    expect(result.approvalError).toBeTruthy();
+    expect(result.approvalError).toMatch(/PR_EMP/);
     expect(result.lineItems[0]!.success).toBe(true);
   });
 });

@@ -123,13 +123,17 @@ export function WorkOrdersPage() {
                       </div>
                     </div>
 
+                    <p style={{ color: 'var(--muted)', fontSize: 12, marginTop: 8 }}>
+                      Napomena: stavke se kreiraju sekvencijalno radi izbegavanja DW Oracle SEQ konflikta. Za 100+ stavki računaj ~30s.
+                    </p>
+
                     {createPOMutation.isSuccess && (
                       <div className="card" style={{ background: '#dcfce7', border: '1px solid var(--buy)', marginTop: 8 }}>
                         <strong>PO kreiran:</strong> #{createPOMutation.data.poId}
                         {createPOMutation.data.poNo ? ` (${createPOMutation.data.poNo})` : ''}
                         {createPOMutation.data.approved
                           ? ' · ✓ Approved'
-                          : <span style={{ color: 'var(--warning)' }}> · ⚠ Nije odobren: {createPOMutation.data.approvalError ?? 'nepoznata greška'}</span>}
+                          : <span style={{ color: 'var(--warning)' }}> · ⚠ Status: REKVIZICIJA (odobriti ručno u DelmiaWorks)</span>}
                         <br />
                         Stavki uspešno: {createPOMutation.data.lineItems.filter(l => l.success).length} / {createPOMutation.data.lineItems.length}
                         {createPOMutation.data.lineItems.some(l => !l.success) && (
