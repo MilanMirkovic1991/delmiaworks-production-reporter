@@ -58,16 +58,18 @@ describe('WorkOrdersPage', () => {
   it('renders tree with WO under each manufactured node', async () => {
     renderPage();
     await waitFor(() => screen.getByText('PART-A'));
-    expect(screen.getByText('WO-1000')).toBeInTheDocument();   // root WO
+    // WO numbers appear as "WO WO-1000" in the new design (wo-num span prefixed)
+    expect(screen.getByText(/WO-1000/)).toBeInTheDocument();   // root WO
     expect(screen.getByText('SUB')).toBeInTheDocument();
-    expect(screen.getByText('WO-2000')).toBeInTheDocument();   // sub WO
+    expect(screen.getByText(/WO-2000/)).toBeInTheDocument();   // sub WO
     expect(screen.getByText('NUT')).toBeInTheDocument();       // purchased leaf
-    expect(screen.getByRole('button', { name: /pokreni prijavu/i })).toBeEnabled();
+    // Per-WO "Prijavi" buttons (one per WO in the mock = 2)
+    const buttons = screen.getAllByRole('button', { name: /pokreni prijavu/i });
+    expect(buttons).toHaveLength(2);
+    expect(buttons[0]).toBeEnabled();
   });
 
   it('shows "nema radnog naloga" for manufactured items without WOs', async () => {
-    // Override the mock for this test using mockImplementationOnce on api.workOrderTree wouldn't work because the module mock is already set up.
-    // Instead just check that the helper text doesn't appear when WOs are present.
     renderPage();
     await waitFor(() => screen.getByText('PART-A'));
     // Both manufactured nodes have WOs in our mock, so this text should NOT appear

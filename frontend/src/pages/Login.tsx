@@ -12,35 +12,32 @@ export function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [database, setDatabase] = useState('IQORA');
-  const [eplantId, setEplantId] = useState('13');
 
   const m = useMutation({
-    mutationFn: () => api.login({ baseUrl, username, password, database, eplantId: Number(eplantId) }),
+    mutationFn: () => api.login({ baseUrl, username, password, database }),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ['me'] });
       resetWizard();
-      navigate('/');
+      navigate('/select-eplant');
     },
   });
 
   function onSubmit(e: FormEvent) { e.preventDefault(); m.mutate(); }
 
   return (
-    <div className="app">
+    <div className="app auth-screen">
       <h1>Prijava — DelmiaWorks</h1>
-      <form className="card" onSubmit={onSubmit}>
+      <form className="card auth-card" onSubmit={onSubmit}>
         <div className="row"><label style={{ width: 140 }}>DW Base URL</label>
           <input value={baseUrl} onChange={e => setBaseUrl(e.target.value)} style={{ flex: 1 }} required /></div>
         <div className="row" style={{ marginTop: 8 }}><label style={{ width: 140 }}>Database</label>
           <input value={database} onChange={e => setDatabase(e.target.value)} required /></div>
-        <div className="row" style={{ marginTop: 8 }}><label style={{ width: 140 }}>EPlant ID</label>
-          <input value={eplantId} onChange={e => setEplantId(e.target.value)} type="number" min={1} required /></div>
         <div className="row" style={{ marginTop: 8 }}><label style={{ width: 140 }}>Username</label>
           <input value={username} onChange={e => setUsername(e.target.value)} required autoComplete="username" /></div>
         <div className="row" style={{ marginTop: 8 }}><label style={{ width: 140 }}>Password</label>
           <input value={password} onChange={e => setPassword(e.target.value)} type="password" required autoComplete="current-password" /></div>
         <div className="row" style={{ marginTop: 16 }}>
-          <button type="submit" disabled={m.isPending}>{m.isPending ? 'Prijavljujem...' : 'Prijavi se'}</button>
+          <button type="submit" className="primary" disabled={m.isPending}>{m.isPending ? 'Prijavljujem...' : 'Prijavi se'}</button>
           {m.isError && <span className="error">{(m.error as Error).message}</span>}
         </div>
       </form>

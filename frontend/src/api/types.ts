@@ -1,4 +1,5 @@
 export type Me = { username: string; eplantId: number };
+export type EPlant = { id: number; plantName: string; companyName: string; inactive: boolean };
 export type Item = { arInvtId: number; itemNumber: string; description: string; rev: string; itemClass: string; isPurchased: boolean };
 export type SalesOrderRow = {
   ordDetailId: number; orderNumber: string; company: string; poNumber: string;

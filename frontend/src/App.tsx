@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Login } from './pages/Login.js';
+import { SelectEPlant } from './pages/SelectEPlant.js';
 import { SalesOrdersList } from './pages/SalesOrdersList.js';
 import { SalesOrderItems } from './pages/SalesOrderItems.js';
 import { ReleasesPage } from './pages/Releases.js';
@@ -17,6 +18,7 @@ export function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/select-eplant" element={<ProtectedRoute requireEPlant={false}><SelectEPlant /></ProtectedRoute>} />
           <Route path="/" element={<ProtectedRoute><SalesOrdersList /></ProtectedRoute>} />
           <Route path="/sales-order/items" element={<ProtectedRoute><SalesOrderItems /></ProtectedRoute>} />
           <Route path="/releases" element={<ProtectedRoute><ReleasesPage /></ProtectedRoute>} />

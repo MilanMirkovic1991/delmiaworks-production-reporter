@@ -24,10 +24,6 @@ export function WorkOrdersPage() {
     staleTime: Infinity,
   });
 
-  function onStartReporting() {
-    alert('Pokretanje prijave proizvodnje — Faza 2 (uskoro). Nije još implementirano.');
-  }
-
   if (!so || !lineItem) return null;
 
   const noData = data?.reason === 'NO_DATA';
@@ -36,34 +32,29 @@ export function WorkOrdersPage() {
   return (
     <div className="app">
       <WizardStepper />
-      <div className="row" style={{ justifyContent: 'space-between' }}>
+      <div className="page-header">
         <h2>Stablo radnih naloga: {lineItem.itemNumber} × {finalQty}</h2>
-        <div className="row">
-          <button onClick={() => refetch()}>🔄 Osveži</button>
+        <div className="actions">
+          <button onClick={() => refetch()}>Osveži</button>
           <button onClick={() => { reset(); navigate('/'); }}>↺ Reset</button>
         </div>
       </div>
-      <p>{so.orderNumber} — {so.company}</p>
+      <p style={{ margin: '0 0 8px', color: 'var(--muted)' }}>{so.orderNumber} — {so.company}</p>
       {isFetching && <p>Učitavam stablo radnih naloga...</p>}
       {error && <p className="error">{(error as Error).message}</p>}
       {noData && <p>Nema BOM strukture ni radnih naloga za ovaj artikal.</p>}
       {hasTree && data?.tree && (
         <>
-          <p style={{ color: '#555' }}>
-            Nodes: {data.stats.nodeCount} · max dubina: {data.stats.maxDepth} ·
+          <p className="stats-line">
+            Čvorova: {data.stats.nodeCount} · max dubina: {data.stats.maxDepth} ·
             ukupno WO: {data.stats.totalWorkOrders} · bez WO: {data.stats.itemsWithoutWO} ·
             ciklusa: {data.stats.cycleCount}
           </p>
           <WorkOrderTreeNodeView node={data.tree} defaultExpanded />
         </>
       )}
-      <div className="row" style={{ marginTop: 16, gap: 12 }}>
+      <div className="row" style={{ marginTop: 16 }}>
         <button onClick={() => navigate('/releases')}>← Nazad</button>
-        <button
-          onClick={onStartReporting}
-          disabled={!hasTree || data?.stats.totalWorkOrders === 0}
-          style={{ background: '#2563eb', color: 'white', fontWeight: 'bold' }}
-        >▶ Pokreni prijavu proizvodnje</button>
       </div>
     </div>
   );

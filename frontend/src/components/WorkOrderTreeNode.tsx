@@ -1,49 +1,70 @@
 import { useState } from 'react';
-import type { WorkOrderTreeNode } from '../api/types.js';
+import type { WorkOrderTreeNode, WorkOrderRow } from '../api/types.js';
 
 function classBadge(node: WorkOrderTreeNode): { label: string; cls: string } {
   if (node.cycleDetected) return { label: '⚠ ciklus', cls: 'cycle' };
   return node.isPurchased ? { label: 'KUPOVNI', cls: 'buy' } : { label: 'PROIZVODNI', cls: 'mfg' };
 }
 
+function onStartReporting(wo: WorkOrderRow) {
+  alert(`Pokretanje prijave proizvodnje za WO ${wo.mfgNumber} (ID ${wo.workOrderId}) — Faza 2, uskoro.`);
+}
+
 export function WorkOrderTreeNodeView({ node, defaultExpanded = false }: { node: WorkOrderTreeNode; defaultExpanded?: boolean }) {
   const [open, setOpen] = useState(defaultExpanded);
   const hasChildren = node.children.length > 0;
   const badge = classBadge(node);
+
   return (
-    <div className="tree-node">
-      <div className="row">
-        {hasChildren ? (
-          <button onClick={() => setOpen(o => !o)} style={{ padding: '0 6px' }}>{open ? '▾' : '▸'}</button>
-        ) : <span style={{ width: 18 }} />}
-        <strong>{node.itemNumber}</strong>
-        <span>{node.description}</span>
+    <div className="tree-row" data-level={node.level}>
+      <div className="tree-row-header">
+        <button
+          className="expander"
+          onClick={() => setOpen(o => !o)}
+          disabled={!hasChildren}
+          aria-label={hasChildren ? (open ? 'Collapse' : 'Expand') : 'No children'}
+        >{hasChildren ? (open ? '▾' : '▸') : '·'}</button>
         <span className={`badge ${badge.cls}`}>{badge.label}</span>
-        <span>{node.qtyRequired} {node.uom}</span>
-        <small>nivo {node.level}</small>
+        <span className="item-info">
+          <span className="kv"><span className="k">Ident:</span> <strong>{node.itemNumber || '—'}</strong></span>
+          <span className="kv"><span className="k">Revizija:</span> {node.rev || '—'}</span>
+          <span className="kv"><span className="k">Klasa:</span> {node.itemClass || '—'}</span>
+        </span>
+        <span className="qty"><strong>{node.qtyRequired}</strong> {node.uom}</span>
+        <span className="level-pill">nivo {node.level}</span>
+      </div>
+      <div className="tree-row-desc">
+        <span className="k">Naziv:</span> {node.description || '—'}
       </div>
       {!node.isPurchased && !node.cycleDetected && (
-        <div style={{ marginLeft: 28, marginTop: 4 }}>
+        <div className="tree-row-wos">
           {node.workOrders.length === 0 ? (
-            <em style={{ color: '#888' }}>nema radnog naloga</em>
+            <div className="no-wo">nema radnog naloga za ovaj artikal</div>
           ) : (
-            <ul style={{ margin: 0, paddingLeft: 20 }}>
-              {node.workOrders.map(wo => (
-                <li key={wo.workOrderId}>
-                  <strong>{wo.mfgNumber}</strong>
-                  {wo.mfgDescrip ? ` — ${wo.mfgDescrip}` : ''}
-                  {wo.priorityLevel !== null && wo.priorityLevel !== undefined ? ` · prioritet ${wo.priorityLevel}` : ''}
-                  {wo.startDate ? ` · start ${wo.startDate.slice(0, 10)}` : ''}
-                  {wo.status ? ` · ${wo.status}` : ''}
-                </li>
-              ))}
-            </ul>
+            node.workOrders.map(wo => (
+              <div key={wo.workOrderId} className="wo-row">
+                <span className="wo-num">WO {wo.mfgNumber}</span>
+                {wo.mfgDescrip && <span className="wo-desc">{wo.mfgDescrip}</span>}
+                {wo.priorityLevel != null && <span className="wo-meta">prioritet {wo.priorityLevel}</span>}
+                {wo.startDate && <span className="wo-meta">start {wo.startDate.slice(0, 10)}</span>}
+                {wo.status && <span className="wo-meta">{wo.status}</span>}
+                <button
+                  className="primary small"
+                  aria-label={`Pokreni prijavu proizvodnje za ${wo.mfgNumber}`}
+                  onClick={() => onStartReporting(wo)}
+                >▶ Prijavi proizvodnju</button>
+              </div>
+            ))
           )}
         </div>
       )}
-      {open && node.children.map(c => (
-        <WorkOrderTreeNodeView key={`${c.arInvtId}-${c.level}`} node={c} defaultExpanded={c.level < 3} />
-      ))}
+      {open && hasChildren && (
+        <div className="tree-children">
+          {node.children.map(c => (
+            <WorkOrderTreeNodeView key={`${c.arInvtId}-${c.level}`} node={c} defaultExpanded={c.level < 3} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

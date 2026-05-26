@@ -60,11 +60,11 @@ export function makeInventoryApi(http: AxiosInstance) {
         if (!obj) return null;
         const id = Number(obj.Id ?? obj.ID ?? obj.ArInvtId ?? arInvtId);
         if (!Number.isFinite(id)) return null;
-        const cls = (obj.InventoryClass ?? obj.ItemClass) as string | undefined;
+        const cls = (obj.InventoryClass ?? obj.Class ?? obj.ItemClass) as string | undefined;
         return {
           arInvtId: id,
-          itemNumber: String(obj.ItemNumber ?? obj.ItemNo ?? ''),
-          description: String(obj.Description ?? ''),
+          itemNumber: String(obj.ItemNumber ?? obj.ItemNo ?? obj.Itemno ?? ''),
+          description: String(obj.Description ?? obj.Descrip ?? ''),
           rev: String(obj.Rev ?? ''),
           itemClass: String(cls ?? ''),
           isPurchased: detectPurchased(cls),
@@ -87,11 +87,11 @@ export function makeInventoryApi(http: AxiosInstance) {
           // DW MaterialsForItem response uses Id (not ArInvtId), InventoryClass (not ItemClass),
           // Qty (not QtyRequired), Unit (not Uom), ItemNumber (not ItemNo).
           const id = Number(r.Id ?? r.ArInvtId ?? r.ID);
-          const cls = (r.InventoryClass ?? r.ItemClass) as string | undefined;
+          const cls = (r.InventoryClass ?? r.Class ?? r.ItemClass) as string | undefined;
           return {
             arInvtId: id,
-            itemNumber: String(r.ItemNumber ?? r.ItemNo ?? ''),
-            description: String(r.Description ?? ''),
+            itemNumber: String(r.ItemNumber ?? r.ItemNo ?? r.Itemno ?? ''),
+            description: String(r.Description ?? r.Descrip ?? ''),
             rev: String(r.Rev ?? ''),
             itemClass: String(cls ?? ''),
             isPurchased: detectPurchased(cls),

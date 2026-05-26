@@ -1,4 +1,4 @@
-import type { Me, Item, SalesOrderRow, Release, BomTreeResponse, SalesOrderSummary, SalesOrderLineItem, WorkOrderRow, WorkOrderTreeResponse } from './types.js';
+import type { Me, Item, SalesOrderRow, Release, BomTreeResponse, SalesOrderSummary, SalesOrderLineItem, WorkOrderRow, WorkOrderTreeResponse, EPlant } from './types.js';
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, { credentials: 'include', ...init });
@@ -13,10 +13,17 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  login: (body: { baseUrl: string; username: string; password: string; database: string; eplantId: number }) =>
+  login: (body: { baseUrl: string; username: string; password: string; database: string }) =>
     req<Me>('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
   logout: () => req<{ ok: true }>('/api/auth/logout', { method: 'POST' }),
   me: () => req<Me>('/api/auth/me'),
+  listEPlants: () => req<{ eplants: EPlant[] }>('/api/eplants'),
+  selectEPlant: (eplantId: number) =>
+    req<{ ok: true; eplantId: number }>('/api/auth/select-eplant', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eplantId }),
+    }),
   searchItems: (q: string) => req<{ items: Item[] }>(`/api/items?q=${encodeURIComponent(q)}`),
   salesOrdersForItem: (arInvtId: number) => req<{ salesOrders: SalesOrderRow[] }>(`/api/items/${arInvtId}/sales-orders`),
   releasesForSO: (ordDetailId: number) => req<{ releases: Release[] }>(`/api/sales-orders/${ordDetailId}/releases`),
