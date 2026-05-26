@@ -16,14 +16,17 @@ describe('collectPurchased', () => {
     expect(collectPurchased(null)).toEqual([]);
   });
 
-  it('collects purchased leaves and dedupes by arInvtId', () => {
+  it('collects leaf nodes without WOs and dedupes by arInvtId', () => {
+    // NUT appears twice as a leaf with no WOs → collected + deduplicated
+    // BOLT appears once as a leaf with no WOs → collected
+    // SUB is mid-tree with children → NOT collected even though it has no WO
     const tree = n({
-      arInvtId: 1, itemNumber: 'TOP', isPurchased: false,
+      arInvtId: 1, itemNumber: 'TOP', level: 0,
       children: [
-        n({ arInvtId: 2, itemNumber: 'NUT', isPurchased: true, qtyRequired: 10 }),
-        n({ arInvtId: 3, itemNumber: 'SUB', isPurchased: false, children: [
-          n({ arInvtId: 2, itemNumber: 'NUT', isPurchased: true, qtyRequired: 5 }),
-          n({ arInvtId: 4, itemNumber: 'BOLT', isPurchased: true, qtyRequired: 20 }),
+        n({ arInvtId: 2, itemNumber: 'NUT', level: 1, qtyRequired: 10, workOrders: [] }),
+        n({ arInvtId: 3, itemNumber: 'SUB', level: 1, workOrders: [], children: [
+          n({ arInvtId: 2, itemNumber: 'NUT', level: 2, qtyRequired: 5, workOrders: [] }),
+          n({ arInvtId: 4, itemNumber: 'BOLT', level: 2, qtyRequired: 20, workOrders: [] }),
         ]}),
       ],
     });
@@ -34,12 +37,28 @@ describe('collectPurchased', () => {
     expect(nut.occurrences).toBe(2);
     const bolt = result.find(r => r.itemNumber === 'BOLT')!;
     expect(bolt.totalQty).toBe(20);
+    // SUB must not appear
+    expect(result.find(r => r.itemNumber === 'SUB')).toBeUndefined();
   });
 
   it('skips cycleDetected nodes', () => {
-    const tree = n({ arInvtId: 1, isPurchased: false, children: [
-      n({ arInvtId: 2, itemNumber: 'X', isPurchased: true, cycleDetected: true, qtyRequired: 100 }),
+    const tree = n({ arInvtId: 1, level: 0, children: [
+      n({ arInvtId: 2, itemNumber: 'X', level: 1, cycleDetected: true, qtyRequired: 100, workOrders: [] }),
     ]});
+    expect(collectPurchased(tree)).toEqual([]);
+  });
+
+  it('does not collect a leaf that has a work order', () => {
+    const tree = n({
+      arInvtId: 1, itemNumber: 'TOP', level: 0,
+      children: [
+        n({
+          arInvtId: 2, itemNumber: 'MADE-IN-HOUSE', level: 1, qtyRequired: 3, workOrders: [
+            { workOrderId: 1, mfgNumber: 'WO-1', mfgDescrip: '', arInvtId: 2, eplantId: 1, priorityLevel: null, startDate: null, status: '' },
+          ],
+        }),
+      ],
+    });
     expect(collectPurchased(tree)).toEqual([]);
   });
 });

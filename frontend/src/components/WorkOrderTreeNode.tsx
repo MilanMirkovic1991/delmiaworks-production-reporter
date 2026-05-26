@@ -43,7 +43,7 @@ export function WorkOrderTreeNodeView({ node, defaultExpanded = false }: { node:
           ) : (
             node.workOrders.map(wo => (
               <div key={wo.workOrderId} className="wo-row">
-                <span className="wo-num">WO {wo.mfgNumber}</span>
+                <span className="wo-num">WO {wo.mfgNumber || `#${wo.workOrderId}`}</span>
                 {wo.mfgDescrip && <span className="wo-desc">{wo.mfgDescrip}</span>}
                 {wo.priorityLevel != null && <span className="wo-meta">prioritet {wo.priorityLevel}</span>}
                 {wo.startDate && <span className="wo-meta">start {wo.startDate.slice(0, 10)}</span>}

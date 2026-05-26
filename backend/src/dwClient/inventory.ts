@@ -22,6 +22,8 @@ export type BomMaterial = {
   uom: string;
 };
 
+let sampledMaterialsForItem = false;
+
 const PURCHASED_CLASSES = new Set(['BUY', 'PUR', 'P']);
 function detectPurchased(itemClass: string | undefined): boolean {
   if (!itemClass) return false;
@@ -84,7 +86,8 @@ export function makeInventoryApi(http: AxiosInstance) {
         params: { arinvtId: input.arInvtId, qty: input.qty },
       });
       const rows = pickArray<Record<string, unknown>>(res.data);
-      if (rows.length > 0) {
+      if (rows.length > 0 && !sampledMaterialsForItem) {
+        sampledMaterialsForItem = true;
         const first = rows[0]!;
         logger.info({
           endpoint: 'MaterialsForItem',

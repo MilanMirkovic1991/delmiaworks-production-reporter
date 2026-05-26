@@ -2,6 +2,8 @@ import { AxiosInstance } from 'axios';
 import { pickArray } from './shared.js';
 import { logger } from '../logger.js';
 
+let sampledWorkOrdersForPart = false;
+
 export type WorkOrderRow = {
   workOrderId: number;        // Id
   mfgNumber: string;          // WO number (humans read this)
@@ -20,7 +22,8 @@ export function makeWorkOrdersApi(http: AxiosInstance) {
         params: { arInvtId: input.arInvtId },
       });
       const rows = pickArray<Record<string, unknown>>(res.data);
-      if (rows.length > 0) {
+      if (rows.length > 0 && !sampledWorkOrdersForPart) {
+        sampledWorkOrdersForPart = true;
         const first = rows[0]!;
         logger.info({
           endpoint: 'WorkOrdersForPart',
@@ -44,7 +47,7 @@ export function makeWorkOrdersApi(http: AxiosInstance) {
         })
         .map(r => ({
           workOrderId: Number(r.Id ?? 0),
-          mfgNumber: String(r.MfgNumber ?? r.MfgNo ?? r.WoNumber ?? r.WONumber ?? r.Number ?? r.WorkOrderNo ?? ''),
+          mfgNumber: String(r.MfgNumber ?? r.MfgNo ?? r.WoNumber ?? r.WONumber ?? r.Number ?? r.WorkOrderNo ?? r.Id ?? ''),
           mfgDescrip: String(r.MfgDescrip ?? r.Descrip ?? r.Description ?? ''),
           arInvtId: Number(r.ArInvtId ?? r.StandardID ?? input.arInvtId),
           eplantId: Number(r.EplantID ?? r.EplantId ?? input.eplantId),
