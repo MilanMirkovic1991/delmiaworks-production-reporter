@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { api } from '../api/client.js';
 import { useWizardStore } from '../store/wizardStore.js';
 import { WizardStepper } from '../components/WizardStepper.js';
@@ -33,6 +33,10 @@ export function WorkOrdersPage() {
   const [selectedToBuy, setSelectedToBuy] = useState<Set<number>>(new Set());
   const allBuySelected = purchaseItems.length > 0 && selectedToBuy.size === purchaseItems.length;
 
+  const createPOMutation = useMutation({
+    mutationFn: (items: Array<{ arInvtId: number; quantity: number }>) => api.createPO(items),
+  });
+
   function toggleAllBuy() {
     if (allBuySelected) setSelectedToBuy(new Set());
     else setSelectedToBuy(new Set(purchaseItems.map(i => i.arInvtId)));
@@ -42,11 +46,6 @@ export function WorkOrdersPage() {
     if (next.has(id)) next.delete(id);
     else next.add(id);
     setSelectedToBuy(next);
-  }
-
-  function notImplemented(action: string) {
-    const sel = purchaseItems.filter(i => selectedToBuy.has(i.arInvtId));
-    alert(`${action} — još uvek nije implementirano. Selektovano ${sel.length} artikala. Sledeći korak: integracija sa DW POST endpoint-ima za CreatePO + CreatePOReceipt + PostPOReceipt.`);
   }
 
   if (!so || !lineItem) return null;
@@ -80,80 +79,114 @@ export function WorkOrdersPage() {
             ciklusa: {data.stats.cycleCount}
           </p>
 
-          <h3 style={{ marginTop: 20, marginBottom: 8 }}>Stablo radnih naloga</h3>
-          <WorkOrderTreeNodeView node={data.tree} defaultExpanded />
-
-          <h3 style={{ marginTop: 28, marginBottom: 8 }}>
-            Kupovne komponente za nabavku ({purchaseItems.length})
-          </h3>
-          {purchaseItems.length === 0 ? (
-            <div className="card">Nema kupovnih komponenti u ovom BOM stablu.</div>
-          ) : (
-            <>
-              <div className="card" style={{ background: 'var(--surface-2)' }}>
-                <div className="row" style={{ justifyContent: 'space-between' }}>
-                  <div className="row" style={{ gap: 16 }}>
-                    <label className="row" style={{ gap: 6 }}>
-                      <input type="checkbox" checked={allBuySelected} onChange={toggleAllBuy} />
-                      <span>Selektuj sve ({purchaseItems.length})</span>
-                    </label>
-                    <span style={{ color: 'var(--muted)', fontSize: 13 }}>
-                      Selektovano: <strong>{selectedToBuy.size}</strong> od {purchaseItems.length}
-                    </span>
-                  </div>
-                  <div className="row">
-                    <button
-                      className="primary"
-                      disabled={selectedToBuy.size === 0}
-                      onClick={() => notImplemented('Kreiraj nabavnu porudžbenicu (PO)')}
-                    >📋 Kreiraj PO za selektovane</button>
-                    <button
-                      disabled={selectedToBuy.size === 0}
-                      onClick={() => notImplemented('Automatski prijem na Receive Designator')}
-                    >📥 Prijem na default lokaciju</button>
-                  </div>
-                </div>
+          <div className="wo-layout">
+            <section className="wo-tree-section">
+              <h3>Stablo radnih naloga</h3>
+              <div className="wo-tree-scroll">
+                <WorkOrderTreeNodeView node={data.tree} defaultExpanded />
               </div>
+            </section>
 
-              <table>
-                <thead>
-                  <tr>
-                    <th style={{ width: 40 }}></th>
-                    <th align="left">Ident</th>
-                    <th align="left">Revizija</th>
-                    <th align="left">Naziv</th>
-                    <th align="right">Količina</th>
-                    <th align="left">UOM</th>
-                    <th align="right">Pojavljivanja</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {purchaseItems.map(it => (
-                    <tr
-                      key={it.arInvtId}
-                      onClick={() => toggleBuy(it.arInvtId)}
-                      className={selectedToBuy.has(it.arInvtId) ? 'selected-row' : ''}
-                    >
-                      <td>
-                        <input
-                          type="checkbox"
-                          checked={selectedToBuy.has(it.arInvtId)}
-                          onChange={() => toggleBuy(it.arInvtId)}
-                          onClick={e => e.stopPropagation()}
-                        />
-                      </td>
-                      <td><strong>{it.itemNumber || '—'}</strong></td>
-                      <td>{it.rev || '—'}</td>
-                      <td>{it.description || '—'}</td>
-                      <td align="right"><strong>{formatQty(it.totalQty)}</strong></td>
-                      <td>{it.uom || '—'}</td>
-                      <td align="right">{it.occurrences}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </>
-          )}
+            <section className="wo-purchase-section">
+              <h3>Kupovne komponente za nabavku ({purchaseItems.length})</h3>
+              {purchaseItems.length === 0 ? (
+                <div className="card">Nema kupovnih komponenti u ovom BOM stablu.</div>
+              ) : (
+                <>
+                  <div className="card" style={{ background: 'var(--surface-2)' }}>
+                    <div className="row" style={{ justifyContent: 'space-between' }}>
+                      <div className="row" style={{ gap: 16 }}>
+                        <label className="row" style={{ gap: 6 }}>
+                          <input type="checkbox" checked={allBuySelected} onChange={toggleAllBuy} />
+                          <span>Selektuj sve ({purchaseItems.length})</span>
+                        </label>
+                        <span style={{ color: 'var(--muted)', fontSize: 13 }}>
+                          Selektovano: <strong>{selectedToBuy.size}</strong> od {purchaseItems.length}
+                        </span>
+                      </div>
+                      <div className="row">
+                        <button
+                          className="primary"
+                          disabled={selectedToBuy.size === 0 || createPOMutation.isPending}
+                          onClick={() => {
+                            const sel = purchaseItems.filter(i => selectedToBuy.has(i.arInvtId));
+                            if (sel.length === 0) return;
+                            const confirmed = confirm(`Kreiraj jednu PO ka dobavljaču #61465 sa ${sel.length} stavki?\n\nOvo će kreirati pravu nabavnu porudžbenicu u DelmiaWorks-u.`);
+                            if (!confirmed) return;
+                            createPOMutation.mutate(sel.map(s => ({ arInvtId: s.arInvtId, quantity: s.totalQty })));
+                          }}
+                        >📋 Kreiraj PO za selektovane</button>
+                        <button
+                          disabled={selectedToBuy.size === 0}
+                          onClick={() => alert('Prijem na default lokaciju — još uvek nije implementirano.')}
+                        >📥 Prijem na default lokaciju</button>
+                      </div>
+                    </div>
+
+                    {createPOMutation.isSuccess && (
+                      <div className="card" style={{ background: '#dcfce7', border: '1px solid var(--buy)', marginTop: 8 }}>
+                        <strong>PO kreiran:</strong> #{createPOMutation.data.poId}
+                        {createPOMutation.data.poNo ? ` (${createPOMutation.data.poNo})` : ''}
+                        <br />
+                        Stavki uspešno: {createPOMutation.data.lineItems.filter(l => l.success).length} / {createPOMutation.data.lineItems.length}
+                        {createPOMutation.data.lineItems.some(l => !l.success) && (
+                          <details style={{ marginTop: 6 }}>
+                            <summary>Greške na stavkama</summary>
+                            <ul>
+                              {createPOMutation.data.lineItems.filter(l => !l.success).map(l => (
+                                <li key={l.arInvtId}>arInvtId {l.arInvtId}: {l.error}</li>
+                              ))}
+                            </ul>
+                          </details>
+                        )}
+                      </div>
+                    )}
+                    {createPOMutation.isError && (
+                      <p className="error">Greška: {(createPOMutation.error as Error).message}</p>
+                    )}
+                  </div>
+
+                  <table>
+                    <thead>
+                      <tr>
+                        <th style={{ width: 40 }}></th>
+                        <th align="left">Ident</th>
+                        <th align="left">Revizija</th>
+                        <th align="left">Naziv</th>
+                        <th align="right">Količina</th>
+                        <th align="left">UOM</th>
+                        <th align="right">Pojavljivanja</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {purchaseItems.map(it => (
+                        <tr
+                          key={it.arInvtId}
+                          onClick={() => toggleBuy(it.arInvtId)}
+                          className={selectedToBuy.has(it.arInvtId) ? 'selected-row' : ''}
+                        >
+                          <td>
+                            <input
+                              type="checkbox"
+                              checked={selectedToBuy.has(it.arInvtId)}
+                              onChange={() => toggleBuy(it.arInvtId)}
+                              onClick={e => e.stopPropagation()}
+                            />
+                          </td>
+                          <td><strong>{it.itemNumber || '—'}</strong></td>
+                          <td>{it.rev || '—'}</td>
+                          <td>{it.description || '—'}</td>
+                          <td align="right"><strong>{formatQty(it.totalQty)}</strong></td>
+                          <td>{it.uom || '—'}</td>
+                          <td align="right">{it.occurrences}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
+              )}
+            </section>
+          </div>
         </>
       )}
 

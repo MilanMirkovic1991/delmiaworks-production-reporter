@@ -35,4 +35,14 @@ export const api = {
     req<{ workOrders: WorkOrderRow[] }>(`/api/work-orders?arInvtId=${arInvtId}`),
   workOrderTree: (arInvtId: number, qty: number) =>
     req<WorkOrderTreeResponse>(`/api/work-order-tree?arInvtId=${arInvtId}&qty=${qty}`),
+  createPO: (items: Array<{ arInvtId: number; quantity: number }>) =>
+    req<{
+      poId: number;
+      poNo: string | null;
+      lineItems: Array<{ arInvtId: number; quantity: number; success: boolean; poDetailId?: number; error?: string }>;
+    }>('/api/po/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items }),
+    }),
 };

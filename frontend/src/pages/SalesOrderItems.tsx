@@ -33,6 +33,7 @@ export function SalesOrderItems() {
             <th align="left">Artikal</th>
             <th align="left">Opis</th>
             <th align="left">Rev</th>
+            <th align="left">UOM</th>
             <th align="right">Ukupno</th>
             <th align="right">Isporučeno</th>
             <th align="right">Preostalo</th>
@@ -56,6 +57,7 @@ export function SalesOrderItems() {
               <td>{li.itemNumber}</td>
               <td>{li.description}</td>
               <td>{li.rev}</td>
+              <td>{li.uom || '—'}</td>
               <td align="right">{li.totalOrdered}</td>
               <td align="right">{li.cummShipped}</td>
               <td align="right">{li.remaining}</td>

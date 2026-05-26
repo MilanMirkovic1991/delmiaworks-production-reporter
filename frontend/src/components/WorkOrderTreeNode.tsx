@@ -46,7 +46,9 @@ export function WorkOrderTreeNodeView({ node, defaultExpanded = false }: { node:
                 <span className="wo-num">WO {wo.mfgNumber || `#${wo.workOrderId}`}</span>
                 {wo.mfgDescrip && <span className="wo-desc">{wo.mfgDescrip}</span>}
                 {wo.priorityLevel != null && <span className="wo-meta">prioritet {wo.priorityLevel}</span>}
-                {wo.startDate && <span className="wo-meta">start {wo.startDate.slice(0, 10)}</span>}
+                {wo.startDate && !wo.startDate.startsWith('0001-') && (
+                  <span className="wo-meta">start {wo.startDate.slice(0, 10)}</span>
+                )}
                 {wo.status && <span className="wo-meta">{wo.status}</span>}
                 <button
                   className="primary small"

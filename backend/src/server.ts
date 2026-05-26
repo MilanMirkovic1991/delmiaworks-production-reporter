@@ -13,6 +13,7 @@ import { makeWorkOrdersRouter } from './routes/workOrders.js';
 import { makeBomRouter } from './routes/bom.js';
 import { makeWorkOrderTreeRouter } from './routes/workOrderTree.js';
 import { makeEPlantsRouter } from './routes/eplants.js';
+import { makePORouter } from './routes/po.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 export function createApp(): Express {
@@ -32,6 +33,7 @@ export function createApp(): Express {
   app.use('/api/work-order-tree', makeWorkOrderTreeRouter(sessionStore));
   app.use('/api/bom-tree', makeBomRouter(sessionStore));
   app.use('/api/eplants', makeEPlantsRouter(sessionStore));
+  app.use('/api/po', makePORouter(sessionStore));
 
   app.use(errorHandler);
   return app;

@@ -238,3 +238,39 @@ tr.selected-row:hover { background: var(--accent-soft); }
   margin-bottom: 12px;
 }
 .page-header .actions { display: flex; gap: 8px; }
+
+/* Side-by-side WO layout */
+.wo-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.wo-tree-section h3, .wo-purchase-section h3 {
+  margin: 8px 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.wo-tree-scroll {
+  max-height: 70vh;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  background: var(--surface);
+}
+.wo-purchase-section {
+  position: sticky;
+  top: 12px;
+}
+.wo-purchase-section table {
+  display: block;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+@media (max-width: 1100px) {
+  .wo-layout { grid-template-columns: 1fr; }
+  .wo-purchase-section { position: static; }
+  .wo-tree-scroll { max-height: none; }
+}
