@@ -49,6 +49,34 @@ export function makeInventoryApi(http: AxiosInstance) {
       }));
     },
 
+    async getById(arInvtId: number): Promise<InventoryItem | null> {
+      try {
+        const res = await http.get(`/Manufacturing/Inventory/InventoryItem/${arInvtId}`);
+        const raw = res.data?.data ?? res.data;
+        if (!raw || typeof raw !== 'object') return null;
+        const r = raw as Record<string, unknown>;
+        // Some DW endpoints wrap a single item in an array; handle both shapes
+        const obj = Array.isArray(raw) ? (raw[0] as Record<string, unknown> | undefined) : r;
+        if (!obj) return null;
+        const id = Number(obj.ID ?? obj.ArInvtId ?? obj.Id ?? arInvtId);
+        if (!Number.isFinite(id)) return null;
+        return {
+          arInvtId: id,
+          itemNumber: String(obj.ItemNo ?? obj.ItemNumber ?? ''),
+          description: String(obj.Description ?? ''),
+          rev: String(obj.Rev ?? ''),
+          itemClass: String(obj.ItemClass ?? ''),
+          isPurchased: detectPurchased(obj.ItemClass as string | undefined),
+        };
+      } catch (e: unknown) {
+        if (e && typeof e === 'object' && 'response' in e) {
+          const resp = (e as { response?: { status?: number } }).response;
+          if (resp?.status === 404) return null;
+        }
+        throw e;
+      }
+    },
+
     async getMaterialsForItem(input: { arInvtId: number; qty: number }): Promise<BomMaterial[]> {
       const res = await http.get('/Manufacturing/Inventory/MaterialsForItem/0', {
         params: { arinvtId: input.arInvtId, qty: input.qty },

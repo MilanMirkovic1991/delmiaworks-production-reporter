@@ -25,6 +25,26 @@ describe('dwClient.inventory', () => {
     expect(items[1]).toMatchObject({ arInvtId: 101, itemNumber: 'PART-B', isPurchased: true });
   });
 
+  it('getById returns mapped inventory item by ID', async () => {
+    nock(BASE)
+      .get('/Manufacturing/Inventory/InventoryItem/42')
+      .reply(200, { ID: 42, ItemNo: 'X-42', Description: 'Forty-Two', Rev: 'A', ItemClass: 'MFG' });
+    const client = createDwClient({ baseUrl: BASE });
+    client.setAuthToken('t');
+    const item = await client.inventory.getById(42);
+    expect(item).toMatchObject({ arInvtId: 42, itemNumber: 'X-42', isPurchased: false });
+  });
+
+  it('getById returns null on 404 from DW', async () => {
+    nock(BASE)
+      .get('/Manufacturing/Inventory/InventoryItem/9999')
+      .reply(404, 'not found');
+    const client = createDwClient({ baseUrl: BASE });
+    client.setAuthToken('t');
+    const item = await client.inventory.getById(9999);
+    expect(item).toBeNull();
+  });
+
   it('getMaterialsForItem returns calculated quantities', async () => {
     nock(BASE)
       .get('/Manufacturing/Inventory/MaterialsForItem/0')

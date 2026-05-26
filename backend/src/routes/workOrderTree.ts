@@ -3,13 +3,6 @@ import { SessionStore } from '../session.js';
 import { makeRequireSession } from '../middleware/requireSession.js';
 import { buildWorkOrderTreeWithStats } from '../services/workOrderTreeBuilder.js';
 import { logger } from '../logger.js';
-import { DwClient } from '../dwClient/index.js';
-import { InventoryItem } from '../dwClient/inventory.js';
-
-async function fetchItemById(dw: DwClient, itemId: number): Promise<InventoryItem | null> {
-  const candidates = await dw.inventory.searchItems({ query: String(itemId) });
-  return candidates.find(i => i.arInvtId === itemId) ?? null;
-}
 
 export function makeWorkOrderTreeRouter(store: SessionStore) {
   const router = Router();
@@ -23,7 +16,7 @@ export function makeWorkOrderTreeRouter(store: SessionStore) {
       if (!Number.isFinite(qty) || qty <= 0) { res.status(400).json({ error: 'INVALID_QTY' }); return; }
       const dw = req.dw!;
       const eplantId = req.session!.eplantId;
-      const root = await fetchItemById(dw, itemId);
+      const root = await dw.inventory.getById(itemId);
       if (!root) { res.status(404).json({ error: 'ITEM_NOT_FOUND' }); return; }
 
       const { tree, stats } = await buildWorkOrderTreeWithStats({

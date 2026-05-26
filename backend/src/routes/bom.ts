@@ -3,15 +3,6 @@ import { SessionStore } from '../session.js';
 import { makeRequireSession } from '../middleware/requireSession.js';
 import { buildBomTreeWithStats } from '../services/bomTreeBuilder.js';
 import { logger } from '../logger.js';
-import { DwClient } from '../dwClient/index.js';
-import { InventoryItem } from '../dwClient/inventory.js';
-
-async function fetchItemById(dw: DwClient, itemId: number): Promise<InventoryItem | null> {
-  // Best-effort: search by stringified ID and pick the exact match.
-  // If a DW install exposes a dedicated InventoryItem/{id} endpoint, swap this helper out.
-  const candidates = await dw.inventory.searchItems({ query: String(itemId) });
-  return candidates.find(i => i.arInvtId === itemId) ?? null;
-}
 
 export function makeBomRouter(store: SessionStore) {
   const router = Router();
@@ -26,7 +17,7 @@ export function makeBomRouter(store: SessionStore) {
         return;
       }
       const dw = req.dw!;
-      const root = await fetchItemById(dw, itemId);
+      const root = await dw.inventory.getById(itemId);
       if (!root) {
         res.status(404).json({ error: 'ITEM_NOT_FOUND' });
         return;

@@ -8,7 +8,6 @@ import { createApp } from '../../src/server.js';
 const BASE = 'http://dw.test:8080/WebAPI';
 const fxRoot = JSON.parse(readFileSync(resolve(__dirname, '../fixtures/dw/bom_two_level_root.json'), 'utf8'));
 const fxSub = JSON.parse(readFileSync(resolve(__dirname, '../fixtures/dw/bom_two_level_sub.json'), 'utf8'));
-const listFx = JSON.parse(readFileSync(resolve(__dirname, '../fixtures/dw/inventoryList.json'), 'utf8'));
 const woFx = JSON.parse(readFileSync(resolve(__dirname, '../fixtures/dw/workOrdersForPart.json'), 'utf8'));
 
 // Sub-assembly WO fixture (inline — 1 WO for arInvtId=200, eplantId=1)
@@ -44,7 +43,9 @@ describe('GET /api/work-order-tree', () => {
     const cookies = await login(app);
 
     // Root item lookup
-    nock(BASE).get('/Manufacturing/Inventory/InventoryList/0').query(true).reply(200, listFx);
+    nock(BASE).get('/Manufacturing/Inventory/InventoryItem/100').reply(200, {
+      ID: 100, ItemNo: 'PART-A', Description: 'Widget A', Rev: '1', ItemClass: 'MFG'
+    });
 
     // BOM: root (arInvtId=100) has SUB(200, MFG) + NUT(201, BUY)
     nock(BASE).get('/Manufacturing/Inventory/MaterialsForItem/0')

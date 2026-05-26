@@ -8,7 +8,6 @@ import { createApp } from '../../src/server.js';
 const BASE = 'http://dw.test:8080/WebAPI';
 const fxRoot = JSON.parse(readFileSync(resolve(__dirname, '../fixtures/dw/bom_two_level_root.json'), 'utf8'));
 const fxSub = JSON.parse(readFileSync(resolve(__dirname, '../fixtures/dw/bom_two_level_sub.json'), 'utf8'));
-const listFx = JSON.parse(readFileSync(resolve(__dirname, '../fixtures/dw/inventoryList.json'), 'utf8'));
 
 async function login(app: ReturnType<typeof createApp>) {
   nock(BASE).post('/User/Login').reply(200, { AuthToken: 'tok', UserName: 'u' });
@@ -37,7 +36,9 @@ describe('GET /api/bom-tree', () => {
     const app = createApp();
     const cookies = await login(app);
     // Root item lookup
-    nock(BASE).get('/Manufacturing/Inventory/InventoryList/0').query(true).reply(200, listFx);
+    nock(BASE).get('/Manufacturing/Inventory/InventoryItem/100').reply(200, {
+      ID: 100, ItemNo: 'PART-A', Description: 'Widget A', Rev: '1', ItemClass: 'MFG'
+    });
     // Empty BOM
     nock(BASE).get('/Manufacturing/Inventory/MaterialsForItem/0').query(true).reply(200, { data: [] });
     const res = await request(app).get('/api/bom-tree?itemId=100&qty=10').set('Cookie', cookies!);
@@ -48,7 +49,9 @@ describe('GET /api/bom-tree', () => {
   it('builds 2-level tree end-to-end', async () => {
     const app = createApp();
     const cookies = await login(app);
-    nock(BASE).get('/Manufacturing/Inventory/InventoryList/0').query(true).reply(200, listFx);
+    nock(BASE).get('/Manufacturing/Inventory/InventoryItem/100').reply(200, {
+      ID: 100, ItemNo: 'PART-A', Description: 'Widget A', Rev: '1', ItemClass: 'MFG'
+    });
     nock(BASE).get('/Manufacturing/Inventory/MaterialsForItem/0')
       .query(q => q.arinvtId === '100' && q.qty === '10').reply(200, fxRoot);
     nock(BASE).get('/Manufacturing/Inventory/MaterialsForItem/0')
