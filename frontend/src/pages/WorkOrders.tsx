@@ -150,6 +150,7 @@ export function WorkOrdersPage() {
                     <thead>
                       <tr>
                         <th style={{ width: 40 }}></th>
+                        <th align="right" style={{ width: 50 }}>#</th>
                         <th align="left">Ident</th>
                         <th align="left">Revizija</th>
                         <th align="left">Naziv</th>
@@ -159,7 +160,7 @@ export function WorkOrdersPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {purchaseItems.map(it => (
+                      {purchaseItems.map((it, idx) => (
                         <tr
                           key={it.arInvtId}
                           onClick={() => toggleBuy(it.arInvtId)}
@@ -173,6 +174,7 @@ export function WorkOrdersPage() {
                               onClick={e => e.stopPropagation()}
                             />
                           </td>
+                          <td align="right" style={{ color: 'var(--muted)', fontFamily: 'ui-monospace, monospace', fontSize: 12 }}>{idx + 1}</td>
                           <td><strong>{it.itemNumber || '—'}</strong></td>
                           <td>{it.rev || '—'}</td>
                           <td>{it.description || '—'}</td>

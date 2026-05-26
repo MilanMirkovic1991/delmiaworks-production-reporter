@@ -39,7 +39,7 @@ export const api = {
     req<{
       poId: number;
       poNo: string | null;
-      lineItems: Array<{ arInvtId: number; quantity: number; success: boolean; poDetailId?: number; error?: string }>;
+      lineItems: Array<{ arInvtId: number; quantity: number; success: boolean; poDetailId?: number; releaseId?: number; error?: string }>;
     }>('/api/po/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
