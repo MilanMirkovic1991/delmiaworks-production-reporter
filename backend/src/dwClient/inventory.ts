@@ -58,15 +58,16 @@ export function makeInventoryApi(http: AxiosInstance) {
         // Some DW endpoints wrap a single item in an array; handle both shapes
         const obj = Array.isArray(raw) ? (raw[0] as Record<string, unknown> | undefined) : r;
         if (!obj) return null;
-        const id = Number(obj.ID ?? obj.ArInvtId ?? obj.Id ?? arInvtId);
+        const id = Number(obj.Id ?? obj.ID ?? obj.ArInvtId ?? arInvtId);
         if (!Number.isFinite(id)) return null;
+        const cls = (obj.InventoryClass ?? obj.ItemClass) as string | undefined;
         return {
           arInvtId: id,
-          itemNumber: String(obj.ItemNo ?? obj.ItemNumber ?? ''),
+          itemNumber: String(obj.ItemNumber ?? obj.ItemNo ?? ''),
           description: String(obj.Description ?? ''),
           rev: String(obj.Rev ?? ''),
-          itemClass: String(obj.ItemClass ?? ''),
-          isPurchased: detectPurchased(obj.ItemClass as string | undefined),
+          itemClass: String(cls ?? ''),
+          isPurchased: detectPurchased(cls),
         };
       } catch (e: unknown) {
         if (e && typeof e === 'object' && 'response' in e) {
@@ -81,16 +82,25 @@ export function makeInventoryApi(http: AxiosInstance) {
       const res = await http.get('/Manufacturing/Inventory/MaterialsForItem/0', {
         params: { arinvtId: input.arInvtId, qty: input.qty },
       });
-      return pickArray<Record<string, unknown>>(res.data).map(r => ({
-        arInvtId: Number(r.ArInvtId ?? r.ID),
-        itemNumber: String(r.ItemNo ?? r.ItemNumber ?? ''),
-        description: String(r.Description ?? ''),
-        rev: String(r.Rev ?? ''),
-        itemClass: String(r.ItemClass ?? ''),
-        isPurchased: detectPurchased(r.ItemClass as string | undefined),
-        qtyRequired: Number(r.QtyRequired ?? r.Qty ?? 0),
-        uom: String(r.Uom ?? r.UOM ?? ''),
-      }));
+      return pickArray<Record<string, unknown>>(res.data)
+        .map(r => {
+          // DW MaterialsForItem response uses Id (not ArInvtId), InventoryClass (not ItemClass),
+          // Qty (not QtyRequired), Unit (not Uom), ItemNumber (not ItemNo).
+          const id = Number(r.Id ?? r.ArInvtId ?? r.ID);
+          const cls = (r.InventoryClass ?? r.ItemClass) as string | undefined;
+          return {
+            arInvtId: id,
+            itemNumber: String(r.ItemNumber ?? r.ItemNo ?? ''),
+            description: String(r.Description ?? ''),
+            rev: String(r.Rev ?? ''),
+            itemClass: String(cls ?? ''),
+            isPurchased: detectPurchased(cls),
+            qtyRequired: Number(r.Qty ?? r.QtyRequired ?? 0),
+            uom: String(r.Unit ?? r.Uom ?? r.UOM ?? ''),
+          };
+        })
+        // Defensive: skip rows where the ID didn't parse (prevents NaN cascade in recursion)
+        .filter(c => Number.isFinite(c.arInvtId));
     },
   };
 }
