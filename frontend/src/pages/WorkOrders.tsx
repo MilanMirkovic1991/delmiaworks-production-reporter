@@ -35,6 +35,7 @@ export function WorkOrdersPage() {
       <div className="page-header">
         <h2>Stablo radnih naloga: {lineItem.itemNumber} × {finalQty}</h2>
         <div className="actions">
+          <button onClick={() => navigate('/purchase-prep')}>📦 Pripremi nabavku</button>
           <button onClick={() => refetch()}>Osveži</button>
           <button onClick={() => { reset(); navigate('/'); }}>↺ Reset</button>
         </div>

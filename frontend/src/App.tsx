@@ -6,6 +6,7 @@ import { SalesOrdersList } from './pages/SalesOrdersList.js';
 import { SalesOrderItems } from './pages/SalesOrderItems.js';
 import { ReleasesPage } from './pages/Releases.js';
 import { WorkOrdersPage } from './pages/WorkOrders.js';
+import { PurchasePrep } from './pages/PurchasePrep.js';
 import { ProtectedRoute } from './components/ProtectedRoute.js';
 
 const queryClient = new QueryClient({
@@ -23,6 +24,7 @@ export function App() {
           <Route path="/sales-order/items" element={<ProtectedRoute><SalesOrderItems /></ProtectedRoute>} />
           <Route path="/releases" element={<ProtectedRoute><ReleasesPage /></ProtectedRoute>} />
           <Route path="/work-orders" element={<ProtectedRoute><WorkOrdersPage /></ProtectedRoute>} />
+          <Route path="/purchase-prep" element={<ProtectedRoute><PurchasePrep /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </BrowserRouter>

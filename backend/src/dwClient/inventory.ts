@@ -1,5 +1,6 @@
 import { AxiosInstance } from 'axios';
 import { pickArray } from './shared.js';
+import { logger } from '../logger.js';
 
 export type InventoryItem = {
   arInvtId: number;
@@ -82,7 +83,24 @@ export function makeInventoryApi(http: AxiosInstance) {
       const res = await http.get('/Manufacturing/Inventory/MaterialsForItem/0', {
         params: { arinvtId: input.arInvtId, qty: input.qty },
       });
-      return pickArray<Record<string, unknown>>(res.data)
+      const rows = pickArray<Record<string, unknown>>(res.data);
+      if (rows.length > 0) {
+        const first = rows[0]!;
+        logger.info({
+          endpoint: 'MaterialsForItem',
+          keys: Object.keys(first),
+          sample: {
+            Id: first.Id, ID: first.ID, ArInvtId: first.ArInvtId,
+            ItemNumber: first.ItemNumber, ItemNo: first.ItemNo, Itemno: first.Itemno,
+            Description: first.Description, Descrip: first.Descrip,
+            Rev: first.Rev,
+            InventoryClass: first.InventoryClass, Class: first.Class, ItemClass: first.ItemClass,
+            Qty: first.Qty, QtyRequired: first.QtyRequired,
+            Unit: first.Unit, Uom: first.Uom,
+          },
+        }, 'DW response sample (MaterialsForItem)');
+      }
+      return rows
         .map(r => {
           // DW MaterialsForItem response uses Id (not ArInvtId), InventoryClass (not ItemClass),
           // Qty (not QtyRequired), Unit (not Uom), ItemNumber (not ItemNo).
@@ -96,7 +114,7 @@ export function makeInventoryApi(http: AxiosInstance) {
             itemClass: String(cls ?? ''),
             isPurchased: detectPurchased(cls),
             qtyRequired: Number(r.Qty ?? r.QtyRequired ?? 0),
-            uom: String(r.Unit ?? r.Uom ?? r.UOM ?? ''),
+            uom: String(r.Unit ?? r.Uom ?? (r as Record<string, unknown>).UOM ?? ''),
           };
         })
         // Defensive: skip rows where the ID didn't parse (prevents NaN cascade in recursion)

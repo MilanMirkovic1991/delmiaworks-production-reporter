@@ -224,6 +224,10 @@ tbody tr:hover { background: var(--accent-soft); cursor: pointer; }
 /* Stats line */
 .stats-line { color: var(--muted); font-size: 12px; margin: 0 0 12px; }
 
+/* Selected rows in Purchase Prep table */
+tr.selected-row { background: var(--accent-soft); }
+tr.selected-row:hover { background: var(--accent-soft); }
+
 /* Top action row in WorkOrders page */
 .page-header {
   display: flex;
