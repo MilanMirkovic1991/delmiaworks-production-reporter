@@ -28,8 +28,16 @@ export function makePORouter(store: SessionStore) {
         return;
       }
       logger.info({ vendorId, itemCount: cleanItems.length }, 'Creating PO');
-      const result = await req.dw!.po.createPurchaseOrder({ vendorId, items: cleanItems });
-      logger.info({ poId: result.poId, successCount: result.lineItems.filter(l => l.success).length }, 'PO created');
+      const result = await req.dw!.po.createPurchaseOrder({
+        vendorId,
+        items: cleanItems,
+        approverUsername: req.session!.username,
+      });
+      logger.info({
+        poId: result.poId,
+        approved: result.approved,
+        successCount: result.lineItems.filter(l => l.success).length,
+      }, 'PO created');
       res.json(result);
     } catch (e) { next(e); }
   });

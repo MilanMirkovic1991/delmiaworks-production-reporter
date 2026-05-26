@@ -127,6 +127,9 @@ export function WorkOrdersPage() {
                       <div className="card" style={{ background: '#dcfce7', border: '1px solid var(--buy)', marginTop: 8 }}>
                         <strong>PO kreiran:</strong> #{createPOMutation.data.poId}
                         {createPOMutation.data.poNo ? ` (${createPOMutation.data.poNo})` : ''}
+                        {createPOMutation.data.approved
+                          ? ' · ✓ Approved'
+                          : <span style={{ color: 'var(--warning)' }}> · ⚠ Nije odobren: {createPOMutation.data.approvalError ?? 'nepoznata greška'}</span>}
                         <br />
                         Stavki uspešno: {createPOMutation.data.lineItems.filter(l => l.success).length} / {createPOMutation.data.lineItems.length}
                         {createPOMutation.data.lineItems.some(l => !l.success) && (

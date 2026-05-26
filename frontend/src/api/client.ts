@@ -39,6 +39,8 @@ export const api = {
     req<{
       poId: number;
       poNo: string | null;
+      approved: boolean;
+      approvalError?: string;
       lineItems: Array<{ arInvtId: number; quantity: number; success: boolean; poDetailId?: number; releaseId?: number; error?: string }>;
     }>('/api/po/create', {
       method: 'POST',
