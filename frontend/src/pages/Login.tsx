@@ -8,11 +8,11 @@ export function Login() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const resetWizard = useWizardStore(s => s.reset);
-  const [baseUrl, setBaseUrl] = useState('http://localhost:8080/WebAPI');
+  const [baseUrl, setBaseUrl] = useState('http://192.168.20.28:8080/WebAPI');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [database, setDatabase] = useState('IQORA');
-  const [eplantId, setEplantId] = useState('1');
+  const [eplantId, setEplantId] = useState('13');
 
   const m = useMutation({
     mutationFn: () => api.login({ baseUrl, username, password, database, eplantId: Number(eplantId) }),

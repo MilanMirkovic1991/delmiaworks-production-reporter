@@ -1,5 +1,6 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import { DW_ERROR_CODES, DwError, DwErrorCode } from './types.js';
+import { logger } from '../logger.js';
 
 const DW_CODE_SET = new Set<string>(DW_ERROR_CODES);
 
@@ -20,9 +21,20 @@ export function createHttp(baseUrl: string): AxiosInstance {
     timeout: 15000,
     headers: { 'Content-Type': 'application/json' },
   });
+  http.interceptors.request.use(req => {
+    logger.info({ method: req.method, url: req.url, params: req.params }, 'dw call start');
+    return req;
+  });
   http.interceptors.response.use(
-    r => r,
+    r => {
+      logger.info({ status: r.status, url: r.config.url }, 'dw call ok');
+      return r;
+    },
     (e: AxiosError) => {
+      const url = e.config?.url;
+      const status = e.response?.status;
+      const data = e.response?.data;
+      logger.error({ url, status, data, code: e.code, message: e.message }, 'dw call failed');
       if (e.code === 'ECONNREFUSED' || e.code === 'ECONNABORTED' || e.code === 'ENOTFOUND') {
         throw makeError('DW_UNREACHABLE', `Cannot reach DelmiaWorks at ${baseUrl}`, e);
       }
