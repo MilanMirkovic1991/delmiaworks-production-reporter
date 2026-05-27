@@ -157,12 +157,16 @@ describe('dwClient.po', () => {
     nock(BASE).post('/POReceiving/PO/CreatePOReceipt/0')
       .query(q => Number(q.poDetailId) === 5002 && Number(q.poReleaseId) === 7002 && Number(q.qtyReceived) === 10)
       .reply(200, { data: { Id: 9002 } });
-    // UpdatePoReceiptsLabelsPlan: lotno must be max+1 per item, pono passed through
+    // CreatePoReceiptsLabelsPlan (Prepare for Multiple Labels — required for Serialized stock)
+    nock(BASE).post('/POReceiving/PO/CreatePoReceiptsLabelsPlan/9001').reply(200, { data: {} });
+    nock(BASE).post('/POReceiving/PO/CreatePoReceiptsLabelsPlan/9002').reply(200, { data: {} });
+    // UpdatePoReceiptsLabelsPlan: lotno must be max+1 per item; labelCount=1 (one bulk label per
+    // receipt covering full qty); serial=true (serialized inventory).
     nock(BASE).post('/POReceiving/PO/UpdatePoReceiptsLabelsPlan/9001')
-      .query(q => q.pono === 'PO-TEST-1' && Number(q.arinvtId) === 100 && Number(q.lotno) === 6 && Number(q.qty) === 5)
+      .query(q => q.pono === 'PO-TEST-1' && Number(q.arinvtId) === 100 && Number(q.lotno) === 6 && Number(q.qty) === 5 && Number(q.labelCount) === 1 && q.serial === 'true')
       .reply(200, { data: {} });
     nock(BASE).post('/POReceiving/PO/UpdatePoReceiptsLabelsPlan/9002')
-      .query(q => q.pono === 'PO-TEST-1' && Number(q.arinvtId) === 101 && Number(q.lotno) === 1 && Number(q.qty) === 10)
+      .query(q => q.pono === 'PO-TEST-1' && Number(q.arinvtId) === 101 && Number(q.lotno) === 1 && Number(q.qty) === 10 && Number(q.labelCount) === 1 && q.serial === 'true')
       .reply(200, { data: {} });
     // Post + master label per receipt
     nock(BASE).post('/POReceiving/PO/PostPOReceiptAndUpdateMasterLabel/0')
@@ -205,8 +209,11 @@ describe('dwClient.po', () => {
     nock(BASE).post('/POReceiving/PO/CreatePOReceipt/0').query(q => Number(q.poReleaseId) === 7002).reply(200, { data: { Id: 9002 } });
     nock(BASE).post('/POReceiving/PO/CreatePOReceipt/0').query(q => Number(q.poReleaseId) === 7003).reply(200, { data: { Id: 9003 } });
     // Lot numbers should be 1, 2, 3 across the three releases
-    nock(BASE).post('/POReceiving/PO/UpdatePoReceiptsLabelsPlan/9001').query(q => Number(q.lotno) === 1).reply(200, { data: {} });
+    nock(BASE).post('/POReceiving/PO/CreatePoReceiptsLabelsPlan/9001').reply(200, { data: {} });
+    nock(BASE).post('/POReceiving/PO/UpdatePoReceiptsLabelsPlan/9001').query(q => Number(q.lotno) === 1 && Number(q.labelCount) === 1 && q.serial === 'true').reply(200, { data: {} });
+    nock(BASE).post('/POReceiving/PO/CreatePoReceiptsLabelsPlan/9002').reply(200, { data: {} });
     nock(BASE).post('/POReceiving/PO/UpdatePoReceiptsLabelsPlan/9002').query(q => Number(q.lotno) === 2).reply(200, { data: {} });
+    nock(BASE).post('/POReceiving/PO/CreatePoReceiptsLabelsPlan/9003').reply(200, { data: {} });
     nock(BASE).post('/POReceiving/PO/UpdatePoReceiptsLabelsPlan/9003').query(q => Number(q.lotno) === 3).reply(200, { data: {} });
     nock(BASE).post('/POReceiving/PO/PostPOReceiptAndUpdateMasterLabel/0').query(q => Number(q.poReceiptId) === 9001).reply(200, { data: { FgMultiId: 4001 } });
     nock(BASE).post('/POReceiving/PO/PostPOReceiptAndUpdateMasterLabel/0').query(q => Number(q.poReceiptId) === 9002).reply(200, { data: { FgMultiId: 4002 } });
@@ -230,7 +237,9 @@ describe('dwClient.po', () => {
       ]});
     nock(BASE).post('/POReceiving/PO/CreatePOReceipt/0').query(q => Number(q.poReleaseId) === 7001).reply(200, { data: { Id: 9001 } });
     nock(BASE).post('/POReceiving/PO/CreatePOReceipt/0').query(q => Number(q.poReleaseId) === 7002).reply(200, { data: { Id: 9002 } });
-    nock(BASE).post('/POReceiving/PO/UpdatePoReceiptsLabelsPlan/9001').query(q => Number(q.lotno) === 1).reply(200, { data: {} });
+    nock(BASE).post('/POReceiving/PO/CreatePoReceiptsLabelsPlan/9001').reply(200, { data: {} });
+    nock(BASE).post('/POReceiving/PO/UpdatePoReceiptsLabelsPlan/9001').query(q => Number(q.lotno) === 1 && Number(q.labelCount) === 1 && q.serial === 'true').reply(200, { data: {} });
+    nock(BASE).post('/POReceiving/PO/CreatePoReceiptsLabelsPlan/9002').reply(200, { data: {} });
     nock(BASE).post('/POReceiving/PO/UpdatePoReceiptsLabelsPlan/9002').query(q => Number(q.lotno) === 1).reply(200, { data: {} });
     // First Post fails — lot 1 should NOT be considered used
     nock(BASE).post('/POReceiving/PO/PostPOReceiptAndUpdateMasterLabel/0').query(q => Number(q.poReceiptId) === 9001).reply(500, 'boom');
@@ -264,6 +273,7 @@ describe('dwClient.po', () => {
       .reply(500, 'something broke');
     nock(BASE).post('/POReceiving/PO/CreatePOReceipt/0').query(q => Number(q.poReleaseId) === 7002)
       .reply(200, { data: { Id: 9002 } });
+    nock(BASE).post('/POReceiving/PO/CreatePoReceiptsLabelsPlan/9002').reply(200, { data: {} });
     nock(BASE).post('/POReceiving/PO/UpdatePoReceiptsLabelsPlan/9002').query(true).reply(200, { data: {} });
     nock(BASE).post('/POReceiving/PO/PostPOReceiptAndUpdateMasterLabel/0').query(q => Number(q.poReceiptId) === 9002)
       .reply(200, { data: { FgMultiId: 4002, MasterLabelId: 8002 } });
@@ -287,6 +297,7 @@ describe('dwClient.po', () => {
       .reply(200, { data: [{ Id: 7001, PoDetailId: 5001, Qty: 5 }] });
     nock(BASE).post('/POReceiving/PO/CreatePOReceipt/0').query(true)
       .reply(200, { data: { Id: 9001 } });
+    nock(BASE).post('/POReceiving/PO/CreatePoReceiptsLabelsPlan/9001').reply(200, { data: {} });
     nock(BASE).post('/POReceiving/PO/UpdatePoReceiptsLabelsPlan/9001').query(true).reply(200, { data: {} });
     nock(BASE).post('/POReceiving/PO/PostPOReceiptAndUpdateMasterLabel/0').query(true)
       .reply(500, 'cannot post');
@@ -325,7 +336,9 @@ describe('dwClient.po', () => {
       .reply(200, { data: { Id: 9001 } });
     nock(BASE).post('/POReceiving/PO/CreatePOReceipt/0').query(q => Number(q.poReleaseId) === 7002 && Number(q.qtyReceived) === 10)
       .reply(200, { data: { Id: 9002 } });
+    nock(BASE).post('/POReceiving/PO/CreatePoReceiptsLabelsPlan/9001').reply(200, { data: {} });
     nock(BASE).post('/POReceiving/PO/UpdatePoReceiptsLabelsPlan/9001').query(true).reply(200, { data: {} });
+    nock(BASE).post('/POReceiving/PO/CreatePoReceiptsLabelsPlan/9002').reply(200, { data: {} });
     nock(BASE).post('/POReceiving/PO/UpdatePoReceiptsLabelsPlan/9002').query(true).reply(200, { data: {} });
     nock(BASE).post('/POReceiving/PO/PostPOReceiptAndUpdateMasterLabel/0').query(q => Number(q.poReceiptId) === 9001)
       .reply(200, { data: { FgMultiId: 4001 } });

@@ -39,10 +39,10 @@ if not exist "node_modules\" (
 )
 echo.
 
-REM 3b) Provera da li je port 3000 zauzet
-netstat -ano | findstr ":3000 " | findstr "LISTENING" >nul
+REM 3b) Provera da li je port 3001 zauzet
+netstat -ano | findstr ":3001 " | findstr "LISTENING" >nul
 if not errorlevel 1 (
-  echo [UPOZORENJE] Port 3000 je vec zauzet ^(verovatno drugi node proces iz prethodne sesije ili druge aplikacije^).
+  echo [UPOZORENJE] Port 3001 je vec zauzet ^(verovatno drugi node proces iz prethodne sesije ili druge aplikacije^).
   echo Backend ne moze da startuje na zauzetom portu - ulogovanje vraca 404.
   echo.
   echo Resenje: zatvori sve "BACKEND" prozore + sve "node.exe" procese koji nisu deo ove aplikacije,
@@ -54,14 +54,14 @@ if not errorlevel 1 (
 
 REM 4) Pokreni backend u novom prozoru
 echo [3/4] Pokrecem backend u novom prozoru...
-start "DW Reporter - BACKEND (port 3000)" cmd /k "npm run dev:backend"
+start "DW Reporter - BACKEND (port 3001)" cmd /k "npm run dev:backend"
 timeout /t 5 /nobreak >nul
 echo.
 
 REM 4b) Provera da li je backend zaista startovao
-netstat -ano | findstr ":3000 " | findstr "LISTENING" >nul
+netstat -ano | findstr ":3001 " | findstr "LISTENING" >nul
 if errorlevel 1 (
-  echo [UPOZORENJE] Backend se nije podigao na portu 3000 u ocekivanom vremenu.
+  echo [UPOZORENJE] Backend se nije podigao na portu 3001 u ocekivanom vremenu.
   echo Pogledaj BACKEND prozor da vidis gresku. Cesti uzroci:
   echo  - npm install nije zavrsen / ima ESM problema
   echo  - port je zauzet od drugog node procesa
@@ -70,7 +70,7 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
-echo  - backend OK na portu 3000
+echo  - backend OK na portu 3001
 echo.
 
 REM 5) Pokreni frontend u novom prozoru

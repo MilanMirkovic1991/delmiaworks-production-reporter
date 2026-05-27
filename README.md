@@ -25,7 +25,7 @@ npm install
 In two terminals:
 
 ```bash
-# Terminal 1 — backend (http://localhost:3000)
+# Terminal 1 — backend (http://localhost:3001)
 npm run dev:backend
 
 # Terminal 2 — frontend (http://localhost:5173)
