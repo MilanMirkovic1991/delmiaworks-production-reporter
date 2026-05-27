@@ -253,12 +253,23 @@ export function makePOApi(http: AxiosInstance) {
             continue;
           }
 
-          // b. "Prepare for Multiple Labels" — CreatePoReceiptsLabelsPlan sets up the label-plan
-          //    entry for this receipt. Required for Serialized Inventory Control items, even
-          //    when we want only one label for the whole received quantity.
+          // b. "Prepare for Multiple Labels" — CreatePoReceiptsLabelsPlan inserts the label-plan
+          //    row for this receipt. Required for Serialized Inventory Control items.
+          //    URL uses {id}=0 (Oracle assigns the row Id); the BODY carries all the actual data,
+          //    most importantly PoReceiptId — otherwise DW throws FK_PO_RECEI_REF_22293_PO_RECEI.
+          //    LmLabelsId hardcoded to 14 per user spec (ARINVT.LM_LABELS_ID is null for all items
+          //    in this install).
           try {
-            const prepUrl = `/POReceiving/PO/CreatePoReceiptsLabelsPlan/${poReceiptId}`;
-            await http.post(prepUrl, {});
+            const prepBody = {
+              PoReceiptId: poReceiptId,
+              ArInvtId: line.arInvtId,
+              LotNo: String(lotNo),
+              LabelCount: 1,         // one bulk label per receipt, NOT one per unit
+              Qty: qty,
+              Serial: true,          // Serialized Inventory Control
+              LmLabelsId: 14,        // label template id when ARINVT.LM_LABELS_ID is null
+            };
+            await http.post(`/POReceiving/PO/CreatePoReceiptsLabelsPlan/0`, prepBody);
           } catch (e: unknown) {
             const msg = (e && typeof e === 'object' && 'message' in e) ? String((e as { message: unknown }).message) : 'unknown';
             receipts.push({
@@ -266,24 +277,6 @@ export function makePOApi(http: AxiosInstance) {
               itemNumber: line.itemNumber, qtyReceived: qty, lotNo, success: false,
               poReceiptId,
               error: `CreatePoReceiptsLabelsPlan failed: ${msg}`,
-            });
-            continue;
-          }
-
-          // c. UpdatePoReceiptsLabelsPlan — fills in pono, arInvtId, lotno, labelCount, qty, serial.
-          //    For our serialized stock: labelCount=1 (one bulk label per receipt covering the full
-          //    quantity, NOT one label per unit) and serial=true (items use serial-number tracking).
-          //    Without this step DW fails Post with 500 because MASTER_LABEL.LotNo is required.
-          try {
-            const labelUrl = `/POReceiving/PO/UpdatePoReceiptsLabelsPlan/${poReceiptId}?pono=${encodeURIComponent(poNo)}&arinvtId=${line.arInvtId}&lotno=${encodeURIComponent(String(lotNo))}&labelCount=1&qty=${qty}&serial=true`;
-            await http.post(labelUrl, {});
-          } catch (e: unknown) {
-            const msg = (e && typeof e === 'object' && 'message' in e) ? String((e as { message: unknown }).message) : 'unknown';
-            receipts.push({
-              poDetailId: line.poDetailId, poReleaseId, arInvtId: line.arInvtId,
-              itemNumber: line.itemNumber, qtyReceived: qty, lotNo, success: false,
-              poReceiptId,
-              error: `UpdatePoReceiptsLabelsPlan failed: ${msg}`,
             });
             continue;
           }
