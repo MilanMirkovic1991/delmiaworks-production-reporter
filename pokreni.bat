@@ -75,13 +75,13 @@ echo.
 
 REM 5) Pokreni frontend u novom prozoru
 echo [4/4] Pokrecem frontend u novom prozoru...
-start "DW Reporter - FRONTEND (port 5173)" cmd /k "npm run dev:frontend"
+start "DW Reporter - FRONTEND (port 5174)" cmd /k "npm run dev:frontend"
 timeout /t 8 /nobreak >nul
 echo.
 
 REM 6) Otvori browser
-echo Otvaram browser na http://localhost:5173 ...
-start "" http://localhost:5173
+echo Otvaram browser na http://localhost:5174 ...
+start "" http://localhost:5174
 
 echo.
 echo ===============================================

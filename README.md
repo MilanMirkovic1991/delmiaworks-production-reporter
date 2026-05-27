@@ -28,11 +28,11 @@ In two terminals:
 # Terminal 1 — backend (http://localhost:3001)
 npm run dev:backend
 
-# Terminal 2 — frontend (http://localhost:5173)
+# Terminal 2 — frontend (http://localhost:5174)
 npm run dev:frontend
 ```
 
-Open http://localhost:5173, log in with your DW credentials, and walk through the wizard.
+Open http://localhost:5174, log in with your DW credentials, and walk through the wizard.
 
 ## Test
 
