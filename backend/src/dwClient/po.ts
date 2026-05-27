@@ -18,6 +18,24 @@ export type CreatePOResult = {
   lineItems: POLineItemResult[];
 };
 
+export type ReceiptResult = {
+  poDetailId: number;
+  poReleaseId: number;
+  arInvtId: number;
+  itemNumber: string;
+  qtyReceived: number;
+  success: boolean;
+  poReceiptId?: number;
+  fgMultiId?: number;
+  masterLabelId?: number;
+  error?: string;
+};
+
+export type ReceivePOResult = {
+  poId: number;
+  receipts: ReceiptResult[];
+};
+
 function todayIso(): string {
   const d = new Date();
   const yyyy = d.getFullYear();
@@ -125,6 +143,111 @@ export function makePOApi(http: AxiosInstance) {
       }
 
       return { poId, poNo, approved, approvalError, lineItems: lineResults };
+    },
+
+    /**
+     * Receives all line items of a PO at full release quantity onto the default
+     * receiving location. For every (lineItem, release) pair we:
+     *   1. POST CreatePOReceipt        — creates the PO_RECEIPTS row
+     *   2. POST PostPOReceiptAndUpdateMasterLabel — posts the receipt, creates FGMULTI,
+     *      and writes the FgMultiId back into MASTER_LABEL (DW handles the linkage).
+     *
+     * Sequential, like createPurchaseOrder, to avoid Oracle SEQ races on receipt IDs.
+     */
+    async receivePO(input: { poId: number; username: string }): Promise<ReceivePOResult> {
+      // 1. Fetch all PO line items
+      const linesRes = await http.get(`/POReceiving/PO/POLineItems/${input.poId}`);
+      const lineRows = (linesRes.data?.data ?? linesRes.data ?? []) as Record<string, unknown>[];
+      const lines = (Array.isArray(lineRows) ? lineRows : []).map(r => ({
+        poDetailId: Number(r.Id ?? r.ID ?? 0),
+        arInvtId: Number(r.ArInvtId ?? r.ARInvtId ?? r.ArinvtId ?? 0),
+        itemNumber: String(r.ItemNumber ?? r.ItemNo ?? ''),
+        quantity: Number(r.Quantity ?? r.Qty ?? 0),
+      })).filter(l => l.poDetailId > 0);
+
+      logger.info({ poId: input.poId, lineCount: lines.length }, 'receivePO: fetched line items');
+
+      const receipts: ReceiptResult[] = [];
+      const dateReceived = todayIso();
+      const comment = `Automatski prijem na default lokaciju`;
+
+      // 2. For each (line, release) pair: CreatePOReceipt -> PostPOReceiptAndUpdateMasterLabel
+      for (const line of lines) {
+        let releaseRows: Record<string, unknown>[] = [];
+        try {
+          const r = await http.get(`/POReceiving/PO/POReleaseItems/0`, {
+            params: { poLineItemId: line.poDetailId },
+          });
+          const data = r.data?.data ?? r.data ?? [];
+          releaseRows = Array.isArray(data) ? data : [];
+        } catch (e: unknown) {
+          const msg = (e && typeof e === 'object' && 'message' in e) ? String((e as { message: unknown }).message) : 'unknown';
+          receipts.push({
+            poDetailId: line.poDetailId, poReleaseId: 0, arInvtId: line.arInvtId,
+            itemNumber: line.itemNumber, qtyReceived: 0, success: false,
+            error: `POReleaseItems fetch failed: ${msg}`,
+          });
+          continue;
+        }
+
+        for (const rr of releaseRows) {
+          const poReleaseId = Number(rr.Id ?? rr.ID ?? 0);
+          const qty = Number(rr.Qty ?? rr.Quantity ?? 0);
+          if (poReleaseId <= 0 || qty <= 0) continue;
+
+          // CreatePOReceipt
+          let poReceiptId = 0;
+          try {
+            const createUrl = `/POReceiving/PO/CreatePOReceipt/0?poDetailId=${line.poDetailId}&poReleaseId=${poReleaseId}&qtyReceived=${qty}&dateReceived=${encodeURIComponent(dateReceived)}&comment=${encodeURIComponent(comment)}&username=${encodeURIComponent(input.username)}`;
+            const cRes = await http.post(createUrl, {});
+            const body = cRes.data?.data ?? cRes.data;
+            poReceiptId = Number(body?.Id ?? body?.ID ?? 0);
+            if (!Number.isFinite(poReceiptId) || poReceiptId <= 0) {
+              receipts.push({
+                poDetailId: line.poDetailId, poReleaseId, arInvtId: line.arInvtId,
+                itemNumber: line.itemNumber, qtyReceived: qty, success: false,
+                error: `CreatePOReceipt returned no Id. Body: ${JSON.stringify(body)}`,
+              });
+              continue;
+            }
+          } catch (e: unknown) {
+            const msg = (e && typeof e === 'object' && 'message' in e) ? String((e as { message: unknown }).message) : 'unknown';
+            receipts.push({
+              poDetailId: line.poDetailId, poReleaseId, arInvtId: line.arInvtId,
+              itemNumber: line.itemNumber, qtyReceived: qty, success: false,
+              error: `CreatePOReceipt failed: ${msg}`,
+            });
+            continue;
+          }
+
+          // PostPOReceiptAndUpdateMasterLabel
+          try {
+            const postUrl = `/POReceiving/PO/PostPOReceiptAndUpdateMasterLabel/0?poReceiptId=${poReceiptId}`;
+            const pRes = await http.post(postUrl, {});
+            const body = pRes.data?.data ?? pRes.data;
+            const fgMultiId = Number(body?.FgMultiId ?? body?.FGMultiId ?? body?.fgMultiId ?? 0) || undefined;
+            const masterLabelId = Number(body?.MasterLabelId ?? body?.MasterLabel?.Id ?? body?.masterLabelId ?? 0) || undefined;
+            receipts.push({
+              poDetailId: line.poDetailId, poReleaseId, arInvtId: line.arInvtId,
+              itemNumber: line.itemNumber, qtyReceived: qty, success: true,
+              poReceiptId, fgMultiId, masterLabelId,
+            });
+          } catch (e: unknown) {
+            const msg = (e && typeof e === 'object' && 'message' in e) ? String((e as { message: unknown }).message) : 'unknown';
+            receipts.push({
+              poDetailId: line.poDetailId, poReleaseId, arInvtId: line.arInvtId,
+              itemNumber: line.itemNumber, qtyReceived: qty, success: false,
+              poReceiptId,
+              error: `PostPOReceiptAndUpdateMasterLabel failed: ${msg}`,
+            });
+          }
+        }
+      }
+
+      const successCount = receipts.filter(r => r.success).length;
+      logger.info({ poId: input.poId, successCount, totalCount: receipts.length }, 'receivePO done');
+
+      return { poId: input.poId, receipts };
     },
   };
 }

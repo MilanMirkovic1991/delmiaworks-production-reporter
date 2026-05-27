@@ -43,5 +43,23 @@ export function makePORouter(store: SessionStore) {
     } catch (e) { next(e); }
   });
 
+  router.post('/:poId/receive', async (req, res, next) => {
+    try {
+      const poId = Number(req.params.poId);
+      if (!Number.isFinite(poId) || poId <= 0) {
+        res.status(400).json({ error: 'INVALID_PO_ID' });
+        return;
+      }
+      logger.info({ poId, username: req.session!.username }, 'Receiving PO');
+      const result = await req.dw!.po.receivePO({
+        poId,
+        username: req.session!.username,
+      });
+      const successCount = result.receipts.filter(r => r.success).length;
+      logger.info({ poId, successCount, totalCount: result.receipts.length }, 'PO received');
+      res.json(result);
+    } catch (e) { next(e); }
+  });
+
   return router;
 }

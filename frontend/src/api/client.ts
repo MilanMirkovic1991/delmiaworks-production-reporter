@@ -47,4 +47,20 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ items }),
     }),
+  receivePO: (poId: number) =>
+    req<{
+      poId: number;
+      receipts: Array<{
+        poDetailId: number;
+        poReleaseId: number;
+        arInvtId: number;
+        itemNumber: string;
+        qtyReceived: number;
+        success: boolean;
+        poReceiptId?: number;
+        fgMultiId?: number;
+        masterLabelId?: number;
+        error?: string;
+      }>;
+    }>(`/api/po/${poId}/receive`, { method: 'POST' }),
 };

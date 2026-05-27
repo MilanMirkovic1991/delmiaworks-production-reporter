@@ -82,8 +82,9 @@ describe('WorkOrdersPage', () => {
     await waitFor(() => screen.getByText('PART-A'));
     // The new inline section heading
     expect(screen.getByRole('heading', { name: /kupovne komponente za nabavku/i })).toBeInTheDocument();
-    // The Create PO and Receive buttons exist (initially disabled because nothing is selected)
+    // The Create PO button exists (initially disabled because nothing is selected).
+    // 'Prijem na default lokaciju' is now inside the PO success card and only renders after a PO is created.
     expect(screen.getByRole('button', { name: /kreiraj po/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /prijem na default/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /prijem na default/i })).toBeNull();
   });
 });

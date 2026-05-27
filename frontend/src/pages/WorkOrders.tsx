@@ -37,6 +37,10 @@ export function WorkOrdersPage() {
     mutationFn: (items: Array<{ arInvtId: number; quantity: number }>) => api.createPO(items),
   });
 
+  const receivePOMutation = useMutation({
+    mutationFn: (poId: number) => api.receivePO(poId),
+  });
+
   function toggleAllBuy() {
     if (allBuySelected) setSelectedToBuy(new Set());
     else setSelectedToBuy(new Set(purchaseItems.map(i => i.arInvtId)));
@@ -116,10 +120,6 @@ export function WorkOrdersPage() {
                             createPOMutation.mutate(sel.map(s => ({ arInvtId: s.arInvtId, quantity: s.totalQty })));
                           }}
                         >📋 Kreiraj PO za selektovane</button>
-                        <button
-                          disabled={selectedToBuy.size === 0}
-                          onClick={() => alert('Prijem na default lokaciju — još uvek nije implementirano.')}
-                        >📥 Prijem na default lokaciju</button>
                       </div>
                     </div>
 
@@ -149,6 +149,69 @@ export function WorkOrdersPage() {
                               ))}
                             </ul>
                           </details>
+                        )}
+
+                        <div className="row" style={{ marginTop: 12, gap: 8 }}>
+                          <button
+                            className="primary"
+                            disabled={receivePOMutation.isPending || receivePOMutation.isSuccess}
+                            onClick={() => {
+                              const successItems = createPOMutation.data!.lineItems.filter(l => l.success).length;
+                              if (successItems === 0) {
+                                alert('Nema uspešno kreiranih stavki za prijem.');
+                                return;
+                              }
+                              const confirmed = confirm(
+                                `Primiti ${successItems} stavki sa PO #${createPOMutation.data!.poId} na default lokaciju?\n\n` +
+                                `Za svaku stavku se kreira PO_RECEIPTS + FGMULTI + MASTER_LABEL u DelmiaWorks-u.\n` +
+                                `Sekvencijalno, ~${Math.ceil(successItems * 0.3)}s.`
+                              );
+                              if (!confirmed) return;
+                              receivePOMutation.mutate(createPOMutation.data!.poId);
+                            }}
+                          >📥 Prijem na default lokaciju</button>
+                          {receivePOMutation.isPending && (
+                            <span style={{ color: 'var(--muted)', fontSize: 13 }}>Primam stavke...</span>
+                          )}
+                        </div>
+
+                        {receivePOMutation.isSuccess && (
+                          <div className="card" style={{ background: '#eff6ff', border: '1px solid #3b82f6', marginTop: 8 }}>
+                            <strong>Prijem završen.</strong>{' '}
+                            Uspešno: {receivePOMutation.data.receipts.filter(r => r.success).length} / {receivePOMutation.data.receipts.length}
+                            {receivePOMutation.data.receipts.length > 0 && (
+                              <details style={{ marginTop: 6 }}>
+                                <summary>Detalji prijema (FGMULTI + Master Label po stavci)</summary>
+                                <table style={{ marginTop: 6, fontSize: 12 }}>
+                                  <thead>
+                                    <tr>
+                                      <th align="left">Ident</th>
+                                      <th align="right">Qty</th>
+                                      <th align="right">Receipt ID</th>
+                                      <th align="right">FGMULTI</th>
+                                      <th align="right">Master Label</th>
+                                      <th align="left">Status</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {receivePOMutation.data.receipts.map(r => (
+                                      <tr key={`${r.poDetailId}-${r.poReleaseId}`}>
+                                        <td>{r.itemNumber || `arInvtId ${r.arInvtId}`}</td>
+                                        <td align="right">{r.qtyReceived}</td>
+                                        <td align="right">{r.poReceiptId ?? '—'}</td>
+                                        <td align="right">{r.fgMultiId ?? '—'}</td>
+                                        <td align="right">{r.masterLabelId ?? '—'}</td>
+                                        <td>{r.success ? '✓' : <span style={{ color: 'var(--error)' }}>✗ {r.error}</span>}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </details>
+                            )}
+                          </div>
+                        )}
+                        {receivePOMutation.isError && (
+                          <p className="error" style={{ marginTop: 8 }}>Greška pri prijemu: {(receivePOMutation.error as Error).message}</p>
                         )}
                       </div>
                     )}

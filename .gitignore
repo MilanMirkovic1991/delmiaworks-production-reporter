@@ -4,6 +4,9 @@ build/
 .env
 .env.local
 *.log
+
+# One-off maintenance scripts with hardcoded credentials — never commit
+backend/tools/
 *.tsbuildinfo
 .DS_Store
 coverage/
