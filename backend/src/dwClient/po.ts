@@ -253,21 +253,20 @@ export function makePOApi(http: AxiosInstance) {
             continue;
           }
 
-          // b. "Prepare for Multiple Labels" — CreatePoReceiptsLabelsPlan inserts the label-plan
-          //    row for this receipt. Required for Serialized Inventory Control items.
-          //    URL uses {id}=0 (Oracle assigns the row Id); the BODY carries all the actual data,
-          //    most importantly PoReceiptId — otherwise DW throws FK_PO_RECEI_REF_22293_PO_RECEI.
-          //    LmLabelsId hardcoded to 14 per user spec (ARINVT.LM_LABELS_ID is null for all items
-          //    in this install).
+          // b. "Prepare for Multiple Labels" — CreatePoReceiptsLabelsPlan inserts a row
+          //    in PO_RECEIPTS_LABEL_PLAN linking the receipt to a label slot.
+          //    Per the actual DTO schema (POReceiptsLabelsPlan):
+          //      - POReceiptsId (NOT PoReceiptId — that was the source of FK_PO_RECEI_REF_22293_PO_RECEI)
+          //      - LabelsCount  (NOT LabelCount)
+          //      - Qty
+          //      - Serial is a string, NOT a boolean
+          //    LotNo, ArInvtId, LmLabelsId are NOT part of this DTO; they live elsewhere.
           try {
             const prepBody = {
-              PoReceiptId: poReceiptId,
-              ArInvtId: line.arInvtId,
-              LotNo: String(lotNo),
-              LabelCount: 1,         // one bulk label per receipt, NOT one per unit
+              POReceiptsId: poReceiptId,
+              LabelsCount: 1,        // one bulk label per receipt
               Qty: qty,
-              Serial: true,          // Serialized Inventory Control
-              LmLabelsId: 14,        // label template id when ARINVT.LM_LABELS_ID is null
+              Serial: '1',           // serial flag as a string per DTO sample
             };
             await http.post(`/POReceiving/PO/CreatePoReceiptsLabelsPlan/0`, prepBody);
           } catch (e: unknown) {
@@ -281,10 +280,19 @@ export function makePOApi(http: AxiosInstance) {
             continue;
           }
 
-          // c. PostPOReceiptAndUpdateMasterLabel — creates FGMULTI + writes FgMultiId into MASTER_LABEL
+          // c. PostPOReceiptAndUpdateMasterLabel — body is a ReceivingTransSettings object.
+          //    THIS is where LotNo + default location go (not in the LabelsPlan). DW takes
+          //    UseDefaultLocation=true → resolves location from ARINVT default Receive Designator,
+          //    creates FGMULTI with that location + lot, and writes FgMultiId into MASTER_LABEL.
           try {
             const postUrl = `/POReceiving/PO/PostPOReceiptAndUpdateMasterLabel/0?poReceiptId=${poReceiptId}`;
-            const pRes = await http.post(postUrl, {});
+            const postBody = {
+              UseDefaultLocation: true,
+              LocationId: 0,
+              LotNo: String(lotNo),
+              TransDate: dateReceived,
+            };
+            const pRes = await http.post(postUrl, postBody);
             const body = pRes.data?.data ?? pRes.data;
             const fgMultiId = Number(body?.FgMultiId ?? body?.FGMultiId ?? body?.fgMultiId ?? 0) || undefined;
             const masterLabelId = Number(body?.MasterLabelId ?? body?.MasterLabel?.Id ?? body?.masterLabelId ?? 0) || undefined;
