@@ -14,11 +14,17 @@ describe('dwClient.po', () => {
     nock(BASE).post('/POReceiving/PO/CreatePOLineItem/0').query(q => Number(q.arinvtId) === 100)
       .reply(200, { data: { Id: 5001 } });
     nock(BASE).post('/POReceiving/PO/CreatePOReleaseItem/0').query(q => Number(q.poDetailId) === 5001)
-      .reply(200, { data: { Id: 7001 } });
+      .reply(200, { data: { Id: 7001, PODetailId: 5001, Quantity: 5 } });
+    // Seq=1 for first release of arInvtId=100
+    nock(BASE).post('/POReceiving/PO/UpdatePOReleaseItem/7001', (b) => (b as { Seq?: number; Id?: number }).Seq === 1 && (b as { Id?: number }).Id === 7001)
+      .reply(200, { data: {} });
     nock(BASE).post('/POReceiving/PO/CreatePOLineItem/0').query(q => Number(q.arinvtId) === 101)
       .reply(200, { data: { Id: 5002 } });
     nock(BASE).post('/POReceiving/PO/CreatePOReleaseItem/0').query(q => Number(q.poDetailId) === 5002)
-      .reply(200, { data: { Id: 7002 } });
+      .reply(200, { data: { Id: 7002, PODetailId: 5002, Quantity: 10 } });
+    // Seq=1 for first release of arInvtId=101 (different arInvtId → counter starts fresh)
+    nock(BASE).post('/POReceiving/PO/UpdatePOReleaseItem/7002', (b) => (b as { Seq?: number }).Seq === 1)
+      .reply(200, { data: {} });
     // Approval flow: GET PO body, then UpdatePO with ApprovedBy='001'
     nock(BASE).get('/POReceiving/PO/PO/999')
       .reply(200, { data: { Id: 999, PONo: 'PO-TEST-1', ApprovedBy: '' } });
@@ -43,10 +49,75 @@ describe('dwClient.po', () => {
     expect(result.lineItems.every(l => l.success)).toBe(true);
     expect(result.lineItems[0]!.poDetailId).toBe(5001);
     expect(result.lineItems[0]!.releaseId).toBe(7001);
+    expect(result.lineItems[0]!.seq).toBe(1);
     expect(result.lineItems[1]!.poDetailId).toBe(5002);
     expect(result.lineItems[1]!.releaseId).toBe(7002);
+    expect(result.lineItems[1]!.seq).toBe(1);
     // The PO body passed back to UpdatePO must carry ApprovedBy='001'
     expect((capturedUpdateBody as { ApprovedBy?: string } | null)?.ApprovedBy).toBe('001');
+  });
+
+  it('createPurchaseOrder: PO_RELEASES.Seq counts per arInvtId (1, 2, 3...) within the same PO', async () => {
+    nock(BASE).post('/POReceiving/PO/CreatePO/0').query({ vendorId: '61465' })
+      .reply(200, { data: { Id: 3000, PONo: 'PO-SEQ' } });
+    // Same arInvtId=100 appearing three times → three PO_DETAILs, three releases, Seq=1,2,3
+    nock(BASE).post('/POReceiving/PO/CreatePOLineItem/0').query(true)
+      .reply(200, { data: { Id: 5001 } });
+    nock(BASE).post('/POReceiving/PO/CreatePOReleaseItem/0').query(q => Number(q.poDetailId) === 5001)
+      .reply(200, { data: { Id: 7001, PODetailId: 5001, Quantity: 5 } });
+    nock(BASE).post('/POReceiving/PO/UpdatePOReleaseItem/7001', (b) => (b as { Seq?: number }).Seq === 1)
+      .reply(200, { data: {} });
+    nock(BASE).post('/POReceiving/PO/CreatePOLineItem/0').query(true)
+      .reply(200, { data: { Id: 5002 } });
+    nock(BASE).post('/POReceiving/PO/CreatePOReleaseItem/0').query(q => Number(q.poDetailId) === 5002)
+      .reply(200, { data: { Id: 7002, PODetailId: 5002, Quantity: 7 } });
+    nock(BASE).post('/POReceiving/PO/UpdatePOReleaseItem/7002', (b) => (b as { Seq?: number }).Seq === 2)
+      .reply(200, { data: {} });
+    nock(BASE).post('/POReceiving/PO/CreatePOLineItem/0').query(true)
+      .reply(200, { data: { Id: 5003 } });
+    nock(BASE).post('/POReceiving/PO/CreatePOReleaseItem/0').query(q => Number(q.poDetailId) === 5003)
+      .reply(200, { data: { Id: 7003, PODetailId: 5003, Quantity: 9 } });
+    nock(BASE).post('/POReceiving/PO/UpdatePOReleaseItem/7003', (b) => (b as { Seq?: number }).Seq === 3)
+      .reply(200, { data: {} });
+    nock(BASE).get('/POReceiving/PO/PO/3000').reply(200, { data: { Id: 3000 } });
+    nock(BASE).post('/POReceiving/PO/UpdatePO/3000').reply(200, { data: {} });
+
+    const client = createDwClient({ baseUrl: BASE });
+    client.setAuthToken('t');
+    const result = await client.po.createPurchaseOrder({
+      vendorId: 61465,
+      items: [
+        { arInvtId: 100, quantity: 5 },
+        { arInvtId: 100, quantity: 7 },
+        { arInvtId: 100, quantity: 9 },
+      ],
+      approverBadge: '001',
+    });
+    expect(result.lineItems.map(l => l.seq)).toEqual([1, 2, 3]);
+  });
+
+  it('createPurchaseOrder: Seq update failure is non-fatal — release still succeeds without seq', async () => {
+    nock(BASE).post('/POReceiving/PO/CreatePO/0').query({ vendorId: '61465' })
+      .reply(200, { data: { Id: 3100, PONo: 'PO-SEQ-FAIL' } });
+    nock(BASE).post('/POReceiving/PO/CreatePOLineItem/0').query(true)
+      .reply(200, { data: { Id: 5001 } });
+    nock(BASE).post('/POReceiving/PO/CreatePOReleaseItem/0').query(true)
+      .reply(200, { data: { Id: 7001, PODetailId: 5001, Quantity: 5 } });
+    // UpdatePOReleaseItem fails — should NOT fail the line, just log.
+    nock(BASE).post('/POReceiving/PO/UpdatePOReleaseItem/7001').reply(500, 'oops');
+    nock(BASE).get('/POReceiving/PO/PO/3100').reply(200, { data: { Id: 3100 } });
+    nock(BASE).post('/POReceiving/PO/UpdatePO/3100').reply(200, { data: {} });
+
+    const client = createDwClient({ baseUrl: BASE });
+    client.setAuthToken('t');
+    const result = await client.po.createPurchaseOrder({
+      vendorId: 61465,
+      items: [{ arInvtId: 100, quantity: 5 }],
+      approverBadge: '001',
+    });
+    expect(result.lineItems[0]!.success).toBe(true);
+    expect(result.lineItems[0]!.releaseId).toBe(7001);
+    expect(result.lineItems[0]!.seq).toBeUndefined();
   });
 
   it('reports line-item failures but still returns the PO (and still approves header)', async () => {
@@ -354,7 +425,8 @@ describe('dwClient.po', () => {
     nock(BASE).post('/POReceiving/PO/CreatePOLineItem/0').query(true)
       .reply(200, { data: { Id: 6001 } });
     nock(BASE).post('/POReceiving/PO/CreatePOReleaseItem/0').query(true)
-      .reply(200, { data: { Id: 8001 } });
+      .reply(200, { data: { Id: 8001, PODetailId: 6001, Quantity: 5 } });
+    nock(BASE).post('/POReceiving/PO/UpdatePOReleaseItem/8001').reply(200, { data: {} });
     nock(BASE).get('/POReceiving/PO/PO/2000').reply(200, { data: { Id: 2000 } });
     nock(BASE).post('/POReceiving/PO/UpdatePO/2000').reply(500, 'approval failed');
 

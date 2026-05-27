@@ -7,6 +7,13 @@ export type POLineItemResult = {
   success: boolean;
   poDetailId?: number;
   releaseId?: number;
+  /**
+   * Sequence number within this PO, counted per arInvtId (1, 2, 3...).
+   * Set via a follow-up UpdatePOReleaseItem call right after CreatePOReleaseItem,
+   * because CreatePOReleaseItem doesn't accept Seq as a query parameter.
+   * Undefined if the Update call failed (release still exists, just lacks Seq).
+   */
+  seq?: number;
   error?: string;
 };
 
@@ -72,7 +79,15 @@ export function makePOApi(http: AxiosInstance) {
       // 2. SEQUENTIAL line item + release creation.
       // Parallel triggered ORA-00001 on UNQ_PO_DETAIL_SEQ in this DW install,
       // so we serialise to let DW allocate sequence numbers safely.
+      //
+      // PO_RELEASES.Seq (the "redni broj" the user wants on each release) cannot
+      // be passed to CreatePOReleaseItem — its signature is
+      //   id_poDetailId_quantity_requestDate_promiseDate
+      // (no Seq), confirmed via /Help/Api. So we set Seq via a follow-up
+      // UpdatePOReleaseItem call. Seq counts per arInvtId within this PO:
+      // first release for arInvtId X → 1, second → 2, etc.
       const lineResults: POLineItemResult[] = [];
+      const seqByArInvt = new Map<number, number>();
       for (const it of input.items) {
         try {
           const lineUrl = `/POReceiving/PO/CreatePOLineItem/0?arinvtId=${it.arInvtId}&poId=${poId}&quantity=${it.quantity}`;
@@ -101,9 +116,28 @@ export function makePOApi(http: AxiosInstance) {
               });
               continue;
             }
+
+            // Compute and persist Seq (redni broj) for this release.
+            // Per-arInvtId counter starts at 1 the first time we see an arInvtId.
+            const nextSeq = (seqByArInvt.get(it.arInvtId) ?? 0) + 1;
+            seqByArInvt.set(it.arInvtId, nextSeq);
+            let seqStored: number | undefined;
+            try {
+              await http.post(
+                `/POReceiving/PO/UpdatePOReleaseItem/${releaseId}`,
+                { ...(releaseBody as Record<string, unknown>), Seq: nextSeq },
+              );
+              seqStored = nextSeq;
+            } catch (seqErr: unknown) {
+              // Non-fatal: PO_RELEASES row exists, just without its sequence number.
+              // The receive flow doesn't depend on Seq, so we log + continue.
+              const msg = (seqErr && typeof seqErr === 'object' && 'message' in seqErr) ? String((seqErr as { message: unknown }).message) : 'unknown';
+              logger.warn({ poId, releaseId, arInvtId: it.arInvtId, attemptedSeq: nextSeq, err: msg }, 'UpdatePOReleaseItem (Seq) failed — release row exists without Seq');
+            }
+
             lineResults.push({
               arInvtId: it.arInvtId, quantity: it.quantity, success: true,
-              poDetailId, releaseId,
+              poDetailId, releaseId, seq: seqStored,
             });
           } catch (releaseErr: unknown) {
             const msg = (releaseErr && typeof releaseErr === 'object' && 'message' in releaseErr) ? String((releaseErr as { message: unknown }).message) : 'unknown';
