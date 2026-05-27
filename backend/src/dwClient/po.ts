@@ -32,6 +32,8 @@ export type ReceiptResult = {
   itemNumber: string;
   qtyReceived: number;
   lotNo?: number;
+  /** MASTER_LABEL.SERIALNO value sent to DW (7-digit zero-padded, derived from poReceiptId). */
+  serialNo?: string;
   success: boolean;
   poReceiptId?: number;
   fgMultiId?: number;
@@ -212,6 +214,29 @@ export function makePOApi(http: AxiosInstance) {
 
       logger.info({ poId: input.poId, poNo, lineCount: lines.length }, 'receivePO: fetched header + line items');
 
+      // 2.5. Find current max MASTER_LABEL.SERIALNO so we can allocate the next
+      //      Serial value monotonically forward (user spec: 7-digit zero-padded,
+      //      strictly sequential, never duplicates). DW enforces a unique constraint
+      //      on AK_MASTER_LABEL_SERIAL — sending the same Serial twice = ORA-00001.
+      //      /Labels/PrintLabel/MasterLabels/0 returns every MASTER_LABEL row in
+      //      the system with a `Serial` field; we take the max numeric value as
+      //      the high-water mark and increment from there.
+      let serialCounter = 0;
+      try {
+        const r = await http.get(`/Labels/PrintLabel/MasterLabels/0`);
+        const data = r.data?.data ?? r.data ?? [];
+        const rows = Array.isArray(data) ? data : [];
+        for (const ml of rows) {
+          const raw = String((ml as Record<string, unknown>).Serial ?? '').trim();
+          const n = Number.parseInt(raw, 10);
+          if (Number.isFinite(n) && n > serialCounter) serialCounter = n;
+        }
+        logger.info({ poId: input.poId, currentMaxSerial: serialCounter, masterLabelCount: rows.length }, 'receivePO: read current max SERIALNO');
+      } catch (e: unknown) {
+        const msg = (e && typeof e === 'object' && 'message' in e) ? String((e as { message: unknown }).message) : 'unknown';
+        logger.warn({ poId: input.poId, err: msg }, 'receivePO: could not read MASTER_LABEL max Serial — starting from 0');
+      }
+
       const receipts: ReceiptResult[] = [];
       const dateReceived = todayIso();
       const comment = `Automatski prijem na default lokaciju`;
@@ -295,19 +320,30 @@ export function makePOApi(http: AxiosInstance) {
           //      - Qty
           //      - Serial is a string, NOT a boolean
           //    LotNo, ArInvtId, LmLabelsId are NOT part of this DTO; they live elsewhere.
+          //
+          //    Serial becomes MASTER_LABEL.SERIALNO. DW enforces AK_MASTER_LABEL_SERIAL
+          //    (unique). Per user spec: 7-digit zero-padded, strictly sequential,
+          //    counts forward indefinitely across all receipts. We picked up the
+          //    current max from /Labels/PrintLabel/MasterLabels above; allocate the
+          //    next value here and increment for the next release.
+          //    Sending Serial='1' for every receipt (old code) was the cause of
+          //    "ORA-00001: unique constraint (IQMS.AK_MASTER_LABEL_SERIAL) violated"
+          //    on every receipt after the first.
+          serialCounter++;
+          const serialNo = String(serialCounter).padStart(7, '0');
           try {
             const prepBody = {
               POReceiptsId: poReceiptId,
               LabelsCount: 1,        // one bulk label per receipt
               Qty: qty,
-              Serial: '1',           // serial flag as a string per DTO sample
+              Serial: serialNo,      // 7-digit padded, globally unique
             };
             await http.post(`/POReceiving/PO/CreatePoReceiptsLabelsPlan/0`, prepBody);
           } catch (e: unknown) {
             const msg = (e && typeof e === 'object' && 'message' in e) ? String((e as { message: unknown }).message) : 'unknown';
             receipts.push({
               poDetailId: line.poDetailId, poReleaseId, arInvtId: line.arInvtId,
-              itemNumber: line.itemNumber, qtyReceived: qty, lotNo, success: false,
+              itemNumber: line.itemNumber, qtyReceived: qty, lotNo, serialNo, success: false,
               poReceiptId,
               error: `CreatePoReceiptsLabelsPlan failed: ${msg}`,
             });
@@ -332,7 +368,7 @@ export function makePOApi(http: AxiosInstance) {
             const masterLabelId = Number(body?.MasterLabelId ?? body?.MasterLabel?.Id ?? body?.masterLabelId ?? 0) || undefined;
             receipts.push({
               poDetailId: line.poDetailId, poReleaseId, arInvtId: line.arInvtId,
-              itemNumber: line.itemNumber, qtyReceived: qty, lotNo, success: true,
+              itemNumber: line.itemNumber, qtyReceived: qty, lotNo, serialNo, success: true,
               poReceiptId, fgMultiId, masterLabelId,
             });
             // Only increment lot after a fully successful receipt — failed attempts shouldn't burn a lot number
@@ -341,7 +377,7 @@ export function makePOApi(http: AxiosInstance) {
             const msg = (e && typeof e === 'object' && 'message' in e) ? String((e as { message: unknown }).message) : 'unknown';
             receipts.push({
               poDetailId: line.poDetailId, poReleaseId, arInvtId: line.arInvtId,
-              itemNumber: line.itemNumber, qtyReceived: qty, lotNo, success: false,
+              itemNumber: line.itemNumber, qtyReceived: qty, lotNo, serialNo, success: false,
               poReceiptId,
               error: `PostPOReceiptAndUpdateMasterLabel failed: ${msg}`,
             });

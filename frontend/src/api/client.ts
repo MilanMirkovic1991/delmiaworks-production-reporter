@@ -57,6 +57,8 @@ export const api = {
         itemNumber: string;
         qtyReceived: number;
         lotNo?: number;
+        /** MASTER_LABEL.SERIALNO sent to DW (7-digit padded, globally sequential). */
+        serialNo?: string;
         success: boolean;
         poReceiptId?: number;
         fgMultiId?: number;

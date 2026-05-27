@@ -188,6 +188,7 @@ export function WorkOrdersPage() {
                                       <th align="left">Ident</th>
                                       <th align="right">Qty</th>
                                       <th align="right">Lot</th>
+                                      <th align="right">Serijski br.</th>
                                       <th align="right">Receipt ID</th>
                                       <th align="right">FGMULTI</th>
                                       <th align="right">Master Label</th>
@@ -200,6 +201,7 @@ export function WorkOrdersPage() {
                                         <td>{r.itemNumber || `arInvtId ${r.arInvtId}`}</td>
                                         <td align="right">{r.qtyReceived}</td>
                                         <td align="right"><strong>{r.lotNo ?? '—'}</strong></td>
+                                        <td align="right"><code>{r.serialNo ?? '—'}</code></td>
                                         <td align="right">{r.poReceiptId ?? '—'}</td>
                                         <td align="right">{r.fgMultiId ?? '—'}</td>
                                         <td align="right">{r.masterLabelId ?? '—'}</td>
