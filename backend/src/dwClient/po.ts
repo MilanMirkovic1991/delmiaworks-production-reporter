@@ -24,6 +24,7 @@ export type ReceiptResult = {
   arInvtId: number;
   itemNumber: string;
   qtyReceived: number;
+  lotNo?: number;
   success: boolean;
   poReceiptId?: number;
   fgMultiId?: number;
@@ -155,7 +156,17 @@ export function makePOApi(http: AxiosInstance) {
      * Sequential, like createPurchaseOrder, to avoid Oracle SEQ races on receipt IDs.
      */
     async receivePO(input: { poId: number; username: string }): Promise<ReceivePOResult> {
-      // 1. Fetch all PO line items
+      // 1. Fetch PO header to get PoNo (needed by UpdatePoReceiptsLabelsPlan)
+      let poNo = '';
+      try {
+        const r = await http.get(`/POReceiving/PO/PO/${input.poId}`);
+        const body = r.data?.data ?? r.data ?? {};
+        poNo = String((body as Record<string, unknown>).PoNo ?? (body as Record<string, unknown>).PONo ?? (body as Record<string, unknown>).PoNumber ?? '');
+      } catch {
+        // non-fatal; some DW configs don't require PoNo in the label plan
+      }
+
+      // 2. Fetch all PO line items
       const linesRes = await http.get(`/POReceiving/PO/POLineItems/${input.poId}`);
       const lineRows = (linesRes.data?.data ?? linesRes.data ?? []) as Record<string, unknown>[];
       const lines = (Array.isArray(lineRows) ? lineRows : []).map(r => ({
@@ -165,14 +176,34 @@ export function makePOApi(http: AxiosInstance) {
         quantity: Number(r.Quantity ?? r.Qty ?? 0),
       })).filter(l => l.poDetailId > 0);
 
-      logger.info({ poId: input.poId, lineCount: lines.length }, 'receivePO: fetched line items');
+      logger.info({ poId: input.poId, poNo, lineCount: lines.length }, 'receivePO: fetched header + line items');
 
       const receipts: ReceiptResult[] = [];
       const dateReceived = todayIso();
       const comment = `Automatski prijem na default lokaciju`;
 
-      // 2. For each (line, release) pair: CreatePOReceipt -> PostPOReceiptAndUpdateMasterLabel
+      // 3. For each (line, release) pair:
+      //    a. Compute next lot (max+1 across existing FGMULTI rows for this arInvtId)
+      //    b. CreatePOReceipt
+      //    c. UpdatePoReceiptsLabelsPlan with lot
+      //    d. PostPOReceiptAndUpdateMasterLabel
       for (const line of lines) {
+        // Compute max lot used so far across all FGMULTI rows for this arInvtId.
+        // Lot numbers in this app are pure integers, per user spec ("redni broj prijema").
+        let maxLot = 0;
+        try {
+          const r = await http.get(`/Manufacturing/Inventory/LocationsForItem/${line.arInvtId}`);
+          const data = r.data?.data ?? r.data ?? [];
+          const rows = Array.isArray(data) ? data : [];
+          for (const lr of rows) {
+            const raw = String((lr as Record<string, unknown>).LotNo ?? '').trim();
+            const n = Number.parseInt(raw, 10);
+            if (Number.isFinite(n) && n > maxLot) maxLot = n;
+          }
+        } catch {
+          // No existing locations or fetch failed: treat as 0 → first lot is 1
+        }
+
         let releaseRows: Record<string, unknown>[] = [];
         try {
           const r = await http.get(`/POReceiving/PO/POReleaseItems/0`, {
@@ -195,7 +226,9 @@ export function makePOApi(http: AxiosInstance) {
           const qty = Number(rr.Qty ?? rr.Quantity ?? 0);
           if (poReleaseId <= 0 || qty <= 0) continue;
 
-          // CreatePOReceipt
+          const lotNo = maxLot + 1;
+
+          // a. CreatePOReceipt
           let poReceiptId = 0;
           try {
             const createUrl = `/POReceiving/PO/CreatePOReceipt/0?poDetailId=${line.poDetailId}&poReleaseId=${poReleaseId}&qtyReceived=${qty}&dateReceived=${encodeURIComponent(dateReceived)}&comment=${encodeURIComponent(comment)}&username=${encodeURIComponent(input.username)}`;
@@ -205,7 +238,7 @@ export function makePOApi(http: AxiosInstance) {
             if (!Number.isFinite(poReceiptId) || poReceiptId <= 0) {
               receipts.push({
                 poDetailId: line.poDetailId, poReleaseId, arInvtId: line.arInvtId,
-                itemNumber: line.itemNumber, qtyReceived: qty, success: false,
+                itemNumber: line.itemNumber, qtyReceived: qty, lotNo, success: false,
                 error: `CreatePOReceipt returned no Id. Body: ${JSON.stringify(body)}`,
               });
               continue;
@@ -214,13 +247,30 @@ export function makePOApi(http: AxiosInstance) {
             const msg = (e && typeof e === 'object' && 'message' in e) ? String((e as { message: unknown }).message) : 'unknown';
             receipts.push({
               poDetailId: line.poDetailId, poReleaseId, arInvtId: line.arInvtId,
-              itemNumber: line.itemNumber, qtyReceived: qty, success: false,
+              itemNumber: line.itemNumber, qtyReceived: qty, lotNo, success: false,
               error: `CreatePOReceipt failed: ${msg}`,
             });
             continue;
           }
 
-          // PostPOReceiptAndUpdateMasterLabel
+          // b. UpdatePoReceiptsLabelsPlan — sets lotno (+pono, arInvtId, count, qty, serial) so
+          //    PostPOReceiptAndUpdateMasterLabel can create FGMULTI + MASTER_LABEL with a lot.
+          //    Without this step DW fails Post with 500 because MASTER_LABEL.LotNo is required.
+          try {
+            const labelUrl = `/POReceiving/PO/UpdatePoReceiptsLabelsPlan/${poReceiptId}?pono=${encodeURIComponent(poNo)}&arinvtId=${line.arInvtId}&lotno=${encodeURIComponent(String(lotNo))}&labelCount=1&qty=${qty}&serial=false`;
+            await http.post(labelUrl, {});
+          } catch (e: unknown) {
+            const msg = (e && typeof e === 'object' && 'message' in e) ? String((e as { message: unknown }).message) : 'unknown';
+            receipts.push({
+              poDetailId: line.poDetailId, poReleaseId, arInvtId: line.arInvtId,
+              itemNumber: line.itemNumber, qtyReceived: qty, lotNo, success: false,
+              poReceiptId,
+              error: `UpdatePoReceiptsLabelsPlan failed: ${msg}`,
+            });
+            continue;
+          }
+
+          // c. PostPOReceiptAndUpdateMasterLabel — creates FGMULTI + writes FgMultiId into MASTER_LABEL
           try {
             const postUrl = `/POReceiving/PO/PostPOReceiptAndUpdateMasterLabel/0?poReceiptId=${poReceiptId}`;
             const pRes = await http.post(postUrl, {});
@@ -229,14 +279,16 @@ export function makePOApi(http: AxiosInstance) {
             const masterLabelId = Number(body?.MasterLabelId ?? body?.MasterLabel?.Id ?? body?.masterLabelId ?? 0) || undefined;
             receipts.push({
               poDetailId: line.poDetailId, poReleaseId, arInvtId: line.arInvtId,
-              itemNumber: line.itemNumber, qtyReceived: qty, success: true,
+              itemNumber: line.itemNumber, qtyReceived: qty, lotNo, success: true,
               poReceiptId, fgMultiId, masterLabelId,
             });
+            // Only increment lot after a fully successful receipt — failed attempts shouldn't burn a lot number
+            maxLot = lotNo;
           } catch (e: unknown) {
             const msg = (e && typeof e === 'object' && 'message' in e) ? String((e as { message: unknown }).message) : 'unknown';
             receipts.push({
               poDetailId: line.poDetailId, poReleaseId, arInvtId: line.arInvtId,
-              itemNumber: line.itemNumber, qtyReceived: qty, success: false,
+              itemNumber: line.itemNumber, qtyReceived: qty, lotNo, success: false,
               poReceiptId,
               error: `PostPOReceiptAndUpdateMasterLabel failed: ${msg}`,
             });

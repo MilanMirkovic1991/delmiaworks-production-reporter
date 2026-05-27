@@ -56,6 +56,7 @@ export const api = {
         arInvtId: number;
         itemNumber: string;
         qtyReceived: number;
+        lotNo?: number;
         success: boolean;
         poReceiptId?: number;
         fgMultiId?: number;
