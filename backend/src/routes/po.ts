@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { SessionStore } from '../session.js';
 import { makeRequireSession } from '../middleware/requireSession.js';
 import { logger } from '../logger.js';
+import type { ReceiptResult } from '../dwClient/po.js';
 
 const DEFAULT_VENDOR_ID = 61465;
 const DEFAULT_APPROVER_BADGE = (process.env.DW_APPROVER_BADGE ?? '001').trim() || '001';
@@ -83,18 +84,18 @@ export function makePORouter(store: SessionStore) {
           arInvtId: Number(o?.arInvtId ?? 0),
           itemNumber: String(o?.itemNumber ?? ''),
           qtyReceived: Number(o?.qtyReceived ?? 0),
-          poReceiptId: o?.poReceiptId != null ? Number(o.poReceiptId) : undefined,
+          poReceiptId: o?.poReceiptId != null ? (Number(o.poReceiptId) || undefined) : undefined,
           priorError: o?.priorError != null ? String(o.priorError) : undefined,
         };
-      }).filter((r: { poDetailId: number; poReleaseId: number; qtyReceived: number }) =>
-        r.poDetailId > 0 && r.poReleaseId > 0 && r.qtyReceived > 0);
+      }).filter((r: { poDetailId: number; poReleaseId: number; arInvtId: number; qtyReceived: number }) =>
+        r.poDetailId > 0 && r.poReleaseId > 0 && r.arInvtId > 0 && r.qtyReceived > 0);
       if (rows.length === 0) {
         res.status(400).json({ error: 'NO_VALID_ROWS' });
         return;
       }
       logger.info({ poId, rowCount: rows.length, username: req.session!.username }, 'Retrying PO receipts');
 
-      const receipts = [];
+      const receipts: ReceiptResult[] = [];
       for (const row of rows) {
         const result = await req.dw!.po.retryReceipt({ ...row, username: req.session!.username });
         receipts.push(result);

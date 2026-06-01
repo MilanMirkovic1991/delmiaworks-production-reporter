@@ -53,7 +53,7 @@ describe('POST /api/po/:poId/receive-retry', () => {
     expect(res.status).toBe(200);
     expect(res.body.poId).toBe(999);
     expect(res.body.receipts).toHaveLength(1);
-    expect(res.body.receipts[0]).toMatchObject({ success: true, poReceiptId: 9001, fgMultiId: 4001 });
+    expect(res.body.receipts[0]).toMatchObject({ success: true, poReceiptId: 9001, fgMultiId: 4001, masterLabelId: 8001 });
   });
 
   it('stops early on a session/auth error and returns only the processed rows', async () => {
