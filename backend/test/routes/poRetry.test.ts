@@ -56,6 +56,37 @@ describe('POST /api/po/:poId/receive-retry', () => {
     expect(res.body.receipts[0]).toMatchObject({ success: true, poReceiptId: 9001, fgMultiId: 4001, masterLabelId: 8001 });
   });
 
+  it('does NOT stop on a non-auth DW error — continues to the next row', async () => {
+    const app = createApp();
+    const cookies = await login(app);
+    // Row 1: readNextLot succeeds, then CreatePOReceipt gets a 500 (non-auth).
+    //   "Request failed with status code 500" does NOT match looksLikeAuthError,
+    //   so the loop must continue to row 2.
+    // Row 2: all 5 steps succeed.
+    // nock matches same-method+url interceptors in definition order:
+    //   first POST to CreatePOReceipt/0 → 500 (consumed by row 1)
+    //   second POST to CreatePOReceipt/0 → 200 { Id: 9002 } (consumed by row 2)
+    nock(BASE).get('/Manufacturing/Inventory/LocationsForItem/100').reply(200, { data: [] });
+    nock(BASE).post('/POReceiving/PO/CreatePOReceipt/0').query(true).reply(500, 'Internal Server Error');
+    nock(BASE).get('/Manufacturing/Inventory/LocationsForItem/101').reply(200, { data: [] });
+    nock(BASE).post('/POReceiving/PO/CreatePOReceipt/0').query(true).reply(200, { data: { Id: 9002 } });
+    nock(BASE).get('/Labels/PrintLabel/MasterLabels/0').reply(200, { data: [] });
+    nock(BASE).post('/POReceiving/PO/CreatePoReceiptsLabelsPlan/0').reply(200, { data: {} });
+    nock(BASE).post('/POReceiving/PO/PostPOReceiptAndUpdateMasterLabel/0').query(true)
+      .reply(200, { data: { FgMultiId: 4002, MasterLabelId: 8002 } });
+
+    const rows = [
+      { poDetailId: 5001, poReleaseId: 7001, arInvtId: 100, itemNumber: 'A', qtyReceived: 5 },
+      { poDetailId: 5002, poReleaseId: 7002, arInvtId: 101, itemNumber: 'B', qtyReceived: 5 },
+    ];
+    const res = await request(app).post('/api/po/999/receive-retry').set('Cookie', cookies!).send({ rows });
+    expect(res.status).toBe(200);
+    expect(res.body.receipts).toHaveLength(2);
+    expect(res.body.receipts[0].success).toBe(false);
+    expect(res.body.receipts[1].success).toBe(true);
+    expect(res.body.receipts[1].poReceiptId).toBe(9002);
+  });
+
   it('stops early on a session/auth error and returns only the processed rows', async () => {
     const app = createApp();
     const cookies = await login(app);
