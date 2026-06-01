@@ -71,8 +71,8 @@ export function WorkOrdersPage() {
   });
 
   const failedReceipts = (receipts ?? []).filter(r => !r.success);
-  const pendingKeys = retryMutation.isPending
-    ? new Set((retryMutation.variables ?? []).map(rowKey))
+  const pendingKeys = retryMutation.isPending && retryMutation.variables
+    ? new Set(retryMutation.variables.map(rowKey))
     : new Set<string>();
 
   function toggleAllBuy() {
@@ -224,7 +224,7 @@ export function WorkOrdersPage() {
                                 )}
                               </div>
                             )}
-                            {receivePOMutation.data.receipts.length > 0 && (
+                            {(receipts ?? []).length > 0 && (
                               <details style={{ marginTop: 6 }}>
                                 <summary>Detalji prijema (FGMULTI + Master Label po stavci)</summary>
                                 <table style={{ marginTop: 6, fontSize: 12 }}>
