@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { api } from '../api/client.js';
+import { api, type ReceiptRow, type RetryRow } from '../api/client.js';
 import { useWizardStore } from '../store/wizardStore.js';
 import { WizardStepper } from '../components/WizardStepper.js';
 import { WorkOrderTreeNodeView } from '../components/WorkOrderTreeNode.js';
@@ -40,6 +40,40 @@ export function WorkOrdersPage() {
   const receivePOMutation = useMutation({
     mutationFn: (poId: number) => api.receivePO(poId),
   });
+
+  const poId = createPOMutation.data?.poId;
+  const [receipts, setReceipts] = useState<ReceiptRow[] | null>(null);
+
+  useEffect(() => {
+    if (receivePOMutation.data) setReceipts(receivePOMutation.data.receipts);
+  }, [receivePOMutation.data]);
+
+  const rowKey = (r: { poDetailId: number; poReleaseId: number }) => `${r.poDetailId}-${r.poReleaseId}`;
+  const toRetryRow = (r: ReceiptRow): RetryRow => ({
+    poDetailId: r.poDetailId,
+    poReleaseId: r.poReleaseId,
+    arInvtId: r.arInvtId,
+    itemNumber: r.itemNumber,
+    qtyReceived: r.qtyReceived,
+    poReceiptId: r.poReceiptId,
+    priorError: r.error,
+  });
+
+  const retryMutation = useMutation({
+    mutationFn: (rows: RetryRow[]) => api.retryReceipts(poId!, rows),
+    onSuccess: (data) => {
+      setReceipts(prev => {
+        const map = new Map((prev ?? []).map(r => [rowKey(r), r] as const));
+        for (const u of data.receipts) map.set(rowKey(u), u);
+        return Array.from(map.values());
+      });
+    },
+  });
+
+  const failedReceipts = (receipts ?? []).filter(r => !r.success);
+  const pendingKeys = retryMutation.isPending
+    ? new Set((retryMutation.variables ?? []).map(rowKey))
+    : new Set<string>();
 
   function toggleAllBuy() {
     if (allBuySelected) setSelectedToBuy(new Set());
@@ -178,7 +212,18 @@ export function WorkOrdersPage() {
                         {receivePOMutation.isSuccess && (
                           <div className="card" style={{ background: '#eff6ff', border: '1px solid #3b82f6', marginTop: 8 }}>
                             <strong>Prijem završen.</strong>{' '}
-                            Uspešno: {receivePOMutation.data.receipts.filter(r => r.success).length} / {receivePOMutation.data.receipts.length}
+                            Uspešno: {(receipts ?? []).filter(r => r.success).length} / {(receipts ?? []).length}
+                            {failedReceipts.length > 0 && (
+                              <div className="row" style={{ marginTop: 8 }}>
+                                <button
+                                  disabled={retryMutation.isPending || !poId}
+                                  onClick={() => retryMutation.mutate(failedReceipts.map(toRetryRow))}
+                                >🔁 Ponovi sve neuspele ({failedReceipts.length})</button>
+                                {retryMutation.isPending && (
+                                  <span style={{ color: 'var(--muted)', fontSize: 13 }}>Ponavljam...</span>
+                                )}
+                              </div>
+                            )}
                             {receivePOMutation.data.receipts.length > 0 && (
                               <details style={{ marginTop: 6 }}>
                                 <summary>Detalji prijema (FGMULTI + Master Label po stavci)</summary>
@@ -196,7 +241,7 @@ export function WorkOrdersPage() {
                                     </tr>
                                   </thead>
                                   <tbody>
-                                    {receivePOMutation.data.receipts.map(r => (
+                                    {(receipts ?? []).map(r => (
                                       <tr key={`${r.poDetailId}-${r.poReleaseId}`}>
                                         <td>{r.itemNumber || `arInvtId ${r.arInvtId}`}</td>
                                         <td align="right">{r.qtyReceived}</td>
@@ -205,7 +250,15 @@ export function WorkOrdersPage() {
                                         <td align="right">{r.poReceiptId ?? '—'}</td>
                                         <td align="right">{r.fgMultiId ?? '—'}</td>
                                         <td align="right">{r.masterLabelId ?? '—'}</td>
-                                        <td>{r.success ? '✓' : <span style={{ color: 'var(--error)' }}>✗ {r.error}</span>}</td>
+                                        <td>{r.success ? '✓' : (
+                                          <span style={{ color: 'var(--error)' }}>
+                                            ✗ {r.error}{' '}
+                                            <button
+                                              disabled={retryMutation.isPending || !poId}
+                                              onClick={() => retryMutation.mutate([toRetryRow(r)])}
+                                            >{pendingKeys.has(rowKey(r)) ? '...' : 'Ponovi'}</button>
+                                          </span>
+                                        )}</td>
                                       </tr>
                                     ))}
                                   </tbody>
