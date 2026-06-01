@@ -78,6 +78,7 @@ describe('dwClient.po.retryReceipt', () => {
     });
     expect(r.success).toBe(true);
     expect(r.poReceiptId).toBe(9001);
+    expect(r.lotNo).toBe(1);
     expect(r.fgMultiId).toBe(4003);
     expect(r.masterLabelId).toBe(8003);
     expect(r.serialNo).toBeUndefined();   // serial was consumed in the prior attempt

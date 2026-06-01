@@ -474,9 +474,14 @@ export function makePOApi(http: AxiosInstance) {
         qtyReceived: input.qtyReceived,
       };
       const dateReceived = todayIso();
-      const comment = `Ponovni prijem na default lokaciju`;
+      const comment = 'Ponovni prijem na default lokaciju';
 
-      const lotNo = await readNextLot(http, input.arInvtId);
+      let lotNo: number;
+      try {
+        lotNo = await readNextLot(http, input.arInvtId);
+      } catch (e: unknown) {
+        return { ...base, success: false, error: `readNextLot failed: ${errMsg(e)}` };
+      }
       let poReceiptId = input.poReceiptId ?? 0;
       let serialNo: string | undefined;
 
@@ -499,7 +504,11 @@ export function makePOApi(http: AxiosInstance) {
 
       // Step 2 — CreatePoReceiptsLabelsPlan (fresh or fromLabels; allocate a serial here)
       if (stage === 'fresh' || stage === 'fromLabels') {
-        serialNo = String(await readNextSerial(http)).padStart(7, '0');
+        try {
+          serialNo = String(await readNextSerial(http)).padStart(7, '0');
+        } catch (e: unknown) {
+          return { ...base, lotNo, poReceiptId, success: false, error: `readNextSerial failed: ${errMsg(e)}` };
+        }
         try {
           await http.post(`/POReceiving/PO/CreatePoReceiptsLabelsPlan/0`, {
             POReceiptsId: poReceiptId,
@@ -524,6 +533,7 @@ export function makePOApi(http: AxiosInstance) {
         const body = pRes.data?.data ?? pRes.data;
         const fgMultiId = Number(body?.FgMultiId ?? body?.FGMultiId ?? body?.fgMultiId ?? 0) || undefined;
         const masterLabelId = Number(body?.MasterLabelId ?? body?.MasterLabel?.Id ?? body?.masterLabelId ?? 0) || undefined;
+        // serialNo is undefined on a 'fromPost' resume: it was allocated in the prior attempt (accepted limitation).
         return { ...base, lotNo, serialNo, poReceiptId, fgMultiId, masterLabelId, success: true };
       } catch (e: unknown) {
         return { ...base, lotNo, serialNo, poReceiptId, success: false, error: `PostPOReceiptAndUpdateMasterLabel failed: ${errMsg(e)}` };
