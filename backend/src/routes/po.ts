@@ -6,6 +6,12 @@ import { logger } from '../logger.js';
 const DEFAULT_VENDOR_ID = 61465;
 const DEFAULT_APPROVER_BADGE = (process.env.DW_APPROVER_BADGE ?? '001').trim() || '001';
 
+/** Heuristic: does this DW error message look like an expired session / auth failure? */
+function looksLikeAuthError(msg?: string): boolean {
+  if (!msg) return false;
+  return /\b(401|403)\b/.test(msg) || /forbidden|unauthor/i.test(msg);
+}
+
 export function makePORouter(store: SessionStore) {
   const router = Router();
   router.use(makeRequireSession(store));
@@ -58,6 +64,48 @@ export function makePORouter(store: SessionStore) {
       const successCount = result.receipts.filter(r => r.success).length;
       logger.info({ poId, successCount, totalCount: result.receipts.length }, 'PO received');
       res.json(result);
+    } catch (e) { next(e); }
+  });
+
+  router.post('/:poId/receive-retry', async (req, res, next) => {
+    try {
+      const poId = Number(req.params.poId);
+      if (!Number.isFinite(poId) || poId <= 0) {
+        res.status(400).json({ error: 'INVALID_PO_ID' });
+        return;
+      }
+      const rawRows = Array.isArray(req.body?.rows) ? req.body.rows : [];
+      const rows = rawRows.map((r: unknown) => {
+        const o = r as Record<string, unknown>;
+        return {
+          poDetailId: Number(o?.poDetailId ?? 0),
+          poReleaseId: Number(o?.poReleaseId ?? 0),
+          arInvtId: Number(o?.arInvtId ?? 0),
+          itemNumber: String(o?.itemNumber ?? ''),
+          qtyReceived: Number(o?.qtyReceived ?? 0),
+          poReceiptId: o?.poReceiptId != null ? Number(o.poReceiptId) : undefined,
+          priorError: o?.priorError != null ? String(o.priorError) : undefined,
+        };
+      }).filter((r: { poDetailId: number; poReleaseId: number; qtyReceived: number }) =>
+        r.poDetailId > 0 && r.poReleaseId > 0 && r.qtyReceived > 0);
+      if (rows.length === 0) {
+        res.status(400).json({ error: 'NO_VALID_ROWS' });
+        return;
+      }
+      logger.info({ poId, rowCount: rows.length, username: req.session!.username }, 'Retrying PO receipts');
+
+      const receipts = [];
+      for (const row of rows) {
+        const result = await req.dw!.po.retryReceipt({ ...row, username: req.session!.username });
+        receipts.push(result);
+        if (!result.success && looksLikeAuthError(result.error)) {
+          logger.warn({ poId, poDetailId: row.poDetailId }, 'Retry batch stopped early — session/auth error');
+          break;
+        }
+      }
+      const successCount = receipts.filter(r => r.success).length;
+      logger.info({ poId, successCount, totalCount: receipts.length }, 'PO receipts retried');
+      res.json({ poId, receipts });
     } catch (e) { next(e); }
   });
 
