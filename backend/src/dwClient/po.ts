@@ -46,6 +46,37 @@ export type ReceivePOResult = {
   receipts: ReceiptResult[];
 };
 
+/** Identifies a single failed receipt row to retry, carrying how far the prior attempt got. */
+export type RetryReceiptInput = {
+  poDetailId: number;
+  poReleaseId: number;
+  arInvtId: number;
+  itemNumber: string;
+  qtyReceived: number;
+  username: string;
+  /** Set iff CreatePOReceipt already succeeded in the prior attempt. */
+  poReceiptId?: number;
+  /** Error message from the prior attempt; its prefix tells us which step failed. */
+  priorError?: string;
+};
+
+export type ResumeStage = 'fresh' | 'fromLabels' | 'fromPost';
+
+/**
+ * Decides where a retry should resume, using ONLY data carried on the failed row:
+ *  - no poReceiptId  → CreatePOReceipt never succeeded → start fresh (all 3 steps)
+ *  - poReceiptId set + error from the Post step → receipt + label already exist → only re-Post
+ *  - poReceiptId set + anything else (label-plan step failed, or unknown) → re-do LabelsPlan + Post
+ * This avoids creating a duplicate PO_RECEIPTS row (the orphan problem) without a
+ * separate DW "does a receipt exist" query.
+ */
+export function resolveResumeStage(input: { poReceiptId?: number; priorError?: string }): ResumeStage {
+  if (!input.poReceiptId || input.poReceiptId <= 0) return 'fresh';
+  const err = input.priorError ?? '';
+  if (err.startsWith('PostPOReceiptAndUpdateMasterLabel')) return 'fromPost';
+  return 'fromLabels';
+}
+
 function todayIso(): string {
   const d = new Date();
   const yyyy = d.getFullYear();
