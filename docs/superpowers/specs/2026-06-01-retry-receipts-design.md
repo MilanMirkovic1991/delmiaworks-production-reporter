@@ -57,8 +57,10 @@ rezultatima prijema koja se pojavi nakon klika na postojeće dugme za prijem.
 **Iznad tabele:**
 
 - Ako ima bar jedan neuspeli red, prikazuje se dugme **„Ponovi sve neuspele"**.
-- Klik obrađuje neuspele redove jedan za drugim (ne sve odjednom — vidi razlog u
-  sekciji 5). Svaki red se osvežava čim njegov rezultat stigne.
+- Klik pošalje sve neuspele redove backendu, koji ih obrađuje jedan za drugim (ne
+  sve odjednom — vidi razlog u sekciji 5) i vrati rezultat za svaki. Kad grupni
+  pokušaj završi, svaki red u tabeli dobije svoj novi ishod (zelena kvačica ili
+  nova poruka greške).
 - Dok grupni pokušaj traje, oba dugmeta (i grupno i pojedinačna) su zaključana.
 - Kad se završi, dugme „Ponovi sve neuspele" nestaje ako više nema neuspelih
   redova, ili ostaje ako ih je još.
