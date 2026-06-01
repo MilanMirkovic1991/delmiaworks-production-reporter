@@ -477,6 +477,8 @@ export function makePOApi(http: AxiosInstance) {
       const comment = 'Ponovni prijem na default lokaciju';
 
       let lotNo: number;
+      // Defensive: readNextLot swallows errors internally today and returns a fallback, so this catch is currently unreachable.
+      // Kept so retryReceipt's contract holds — every failure becomes a failed ReceiptResult, never a thrown exception that would abort the batch loop.
       try {
         lotNo = await readNextLot(http, input.arInvtId);
       } catch (e: unknown) {
@@ -504,6 +506,8 @@ export function makePOApi(http: AxiosInstance) {
 
       // Step 2 — CreatePoReceiptsLabelsPlan (fresh or fromLabels; allocate a serial here)
       if (stage === 'fresh' || stage === 'fromLabels') {
+        // Defensive: readNextSerial swallows errors internally today and returns a fallback, so this catch is currently unreachable.
+        // Kept so retryReceipt's contract holds — every failure becomes a failed ReceiptResult, never a thrown exception that would abort the batch loop.
         try {
           serialNo = String(await readNextSerial(http)).padStart(7, '0');
         } catch (e: unknown) {
