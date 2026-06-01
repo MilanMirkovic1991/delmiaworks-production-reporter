@@ -85,6 +85,44 @@ function todayIso(): string {
   return `${yyyy}-${mm}-${dd}T00:00:00`;
 }
 
+/** Compact error-message extractor used by retryReceipt. */
+function errMsg(e: unknown): string {
+  return (e && typeof e === 'object' && 'message' in e) ? String((e as { message: unknown }).message) : 'unknown';
+}
+
+/**
+ * Next Serial integer = max existing MASTER_LABEL.Serial + 1.
+ * Mirrors the inline logic in receivePO; kept separate so receivePO stays untouched.
+ */
+async function readNextSerial(http: AxiosInstance): Promise<number> {
+  let maxSerial = 0;
+  try {
+    const r = await http.get(`/Labels/PrintLabel/MasterLabels/0`);
+    const data = r.data?.data ?? r.data ?? [];
+    const rows = Array.isArray(data) ? data : [];
+    for (const ml of rows) {
+      const n = Number.parseInt(String((ml as Record<string, unknown>).Serial ?? '').trim(), 10);
+      if (Number.isFinite(n) && n > maxSerial) maxSerial = n;
+    }
+  } catch { /* no labels yet → first serial is 1 */ }
+  return maxSerial + 1;
+}
+
+/** Next lot integer for an item = max existing FGMULTI/Location LotNo + 1. */
+async function readNextLot(http: AxiosInstance, arInvtId: number): Promise<number> {
+  let maxLot = 0;
+  try {
+    const r = await http.get(`/Manufacturing/Inventory/LocationsForItem/${arInvtId}`);
+    const data = r.data?.data ?? r.data ?? [];
+    const rows = Array.isArray(data) ? data : [];
+    for (const lr of rows) {
+      const n = Number.parseInt(String((lr as Record<string, unknown>).LotNo ?? '').trim(), 10);
+      if (Number.isFinite(n) && n > maxLot) maxLot = n;
+    }
+  } catch { /* none → first lot is 1 */ }
+  return maxLot + 1;
+}
+
 export function makePOApi(http: AxiosInstance) {
   return {
     async createPurchaseOrder(input: {
@@ -420,6 +458,76 @@ export function makePOApi(http: AxiosInstance) {
       logger.info({ poId: input.poId, successCount, totalCount: receipts.length }, 'receivePO done');
 
       return { poId: input.poId, receipts };
+    },
+
+    /**
+     * Retries ONE failed receipt row, resuming from where the prior attempt stopped
+     * (see resolveResumeStage). receivePO is intentionally NOT reused or modified.
+     */
+    async retryReceipt(input: RetryReceiptInput): Promise<ReceiptResult> {
+      const stage = resolveResumeStage(input);
+      const base = {
+        poDetailId: input.poDetailId,
+        poReleaseId: input.poReleaseId,
+        arInvtId: input.arInvtId,
+        itemNumber: input.itemNumber,
+        qtyReceived: input.qtyReceived,
+      };
+      const dateReceived = todayIso();
+      const comment = `Ponovni prijem na default lokaciju`;
+
+      const lotNo = await readNextLot(http, input.arInvtId);
+      let poReceiptId = input.poReceiptId ?? 0;
+      let serialNo: string | undefined;
+
+      logger.info({ ...base, stage, existingPoReceiptId: input.poReceiptId }, 'retryReceipt: start');
+
+      // Step 1 — CreatePOReceipt (only when starting fresh; never re-create an existing receipt)
+      if (stage === 'fresh') {
+        try {
+          const createUrl = `/POReceiving/PO/CreatePOReceipt/0?poDetailId=${input.poDetailId}&poReleaseId=${input.poReleaseId}&qtyReceived=${input.qtyReceived}&dateReceived=${encodeURIComponent(dateReceived)}&comment=${encodeURIComponent(comment)}&username=${encodeURIComponent(input.username)}`;
+          const cRes = await http.post(createUrl, {});
+          const body = cRes.data?.data ?? cRes.data;
+          poReceiptId = Number(body?.Id ?? body?.ID ?? 0);
+          if (!Number.isFinite(poReceiptId) || poReceiptId <= 0) {
+            return { ...base, lotNo, success: false, error: `CreatePOReceipt returned no Id. Body: ${JSON.stringify(body)}` };
+          }
+        } catch (e: unknown) {
+          return { ...base, lotNo, success: false, error: `CreatePOReceipt failed: ${errMsg(e)}` };
+        }
+      }
+
+      // Step 2 — CreatePoReceiptsLabelsPlan (fresh or fromLabels; allocate a serial here)
+      if (stage === 'fresh' || stage === 'fromLabels') {
+        serialNo = String(await readNextSerial(http)).padStart(7, '0');
+        try {
+          await http.post(`/POReceiving/PO/CreatePoReceiptsLabelsPlan/0`, {
+            POReceiptsId: poReceiptId,
+            LabelsCount: 1,
+            Qty: input.qtyReceived,
+            Serial: serialNo,
+          });
+        } catch (e: unknown) {
+          return { ...base, lotNo, serialNo, poReceiptId, success: false, error: `CreatePoReceiptsLabelsPlan failed: ${errMsg(e)}` };
+        }
+      }
+
+      // Step 3 — PostPOReceiptAndUpdateMasterLabel (always)
+      try {
+        const postUrl = `/POReceiving/PO/PostPOReceiptAndUpdateMasterLabel/0?poReceiptId=${poReceiptId}`;
+        const pRes = await http.post(postUrl, {
+          UseDefaultLocation: true,
+          LocationId: 0,
+          LotNo: String(lotNo),
+          TransDate: dateReceived,
+        });
+        const body = pRes.data?.data ?? pRes.data;
+        const fgMultiId = Number(body?.FgMultiId ?? body?.FGMultiId ?? body?.fgMultiId ?? 0) || undefined;
+        const masterLabelId = Number(body?.MasterLabelId ?? body?.MasterLabel?.Id ?? body?.masterLabelId ?? 0) || undefined;
+        return { ...base, lotNo, serialNo, poReceiptId, fgMultiId, masterLabelId, success: true };
+      } catch (e: unknown) {
+        return { ...base, lotNo, serialNo, poReceiptId, success: false, error: `PostPOReceiptAndUpdateMasterLabel failed: ${errMsg(e)}` };
+      }
     },
   };
 }
