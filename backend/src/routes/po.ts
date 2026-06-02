@@ -110,5 +110,27 @@ export function makePORouter(store: SessionStore) {
     } catch (e) { next(e); }
   });
 
+  // Pre-receive validator: warns about likely-failing rows (no recipe / serialized+fractional).
+  // Read-only; never creates or blocks a receipt. Mirrors the /create input cleaning.
+  router.post('/:poId/receive-validate', async (req, res, next) => {
+    try {
+      const poId = Number(req.params.poId);
+      if (!Number.isFinite(poId) || poId <= 0) { res.status(400).json({ error: 'INVALID_PO_ID' }); return; }
+      const raw = Array.isArray(req.body?.items) ? req.body.items : [];
+      const items = raw.map((r: unknown) => {
+        const o = r as Record<string, unknown>;
+        return {
+          arInvtId: Number(o?.arInvtId ?? 0),
+          itemNumber: String(o?.itemNumber ?? ''),
+          quantity: Number(o?.quantity ?? 0),
+        };
+      }).filter((i: { arInvtId: number }) => Number.isFinite(i.arInvtId) && i.arInvtId > 0);
+      if (items.length === 0) { res.status(400).json({ error: 'NO_VALID_ITEMS' }); return; }
+      const result = await req.dw!.po.validateReceipt({ items });
+      logger.info({ poId, warningCount: result.warnings.length }, 'PO receipt validated');
+      res.json({ poId, ...result });
+    } catch (e) { next(e); }
+  });
+
   return router;
 }
