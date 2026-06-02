@@ -1,5 +1,6 @@
 import { AxiosInstance } from 'axios';
 import { logger } from '../logger.js';
+import { makeInventoryApi } from './inventory.js';
 
 export type POLineItemResult = {
   arInvtId: number;
@@ -123,7 +124,23 @@ async function readNextLot(http: AxiosInstance, arInvtId: number): Promise<numbe
   return maxLot + 1;
 }
 
+/** One PO line to validate before receiving (group A/C inputs). */
+export type ValidateItemInput = { arInvtId: number; itemNumber: string; quantity: number };
+
+export type WarningKind = 'NO_RECIPE' | 'RECIPE_UNRELIABLE' | 'ORPHAN_LABEL' | 'SERIAL_FRACTIONAL';
+
+/** A grouped pre-receive warning: one kind, a Serbian summary, and the affected items. */
+export type ReceiptWarning = {
+  kind: WarningKind;
+  message: string;
+  items: Array<{ arInvtId: number; itemNumber: string }>;
+};
+
+export type ValidateResult = { warnings: ReceiptWarning[] };
+
 export function makePOApi(http: AxiosInstance) {
+  // Reused by validateReceipt for per-item recipe/serial reads. receivePO is untouched.
+  const inventory = makeInventoryApi(http);
   return {
     async createPurchaseOrder(input: {
       vendorId: number;
@@ -542,6 +559,53 @@ export function makePOApi(http: AxiosInstance) {
       } catch (e: unknown) {
         return { ...base, lotNo, serialNo, poReceiptId, success: false, error: `PostPOReceiptAndUpdateMasterLabel failed: ${errMsg(e)}` };
       }
+    },
+
+    /**
+     * Pre-receive check (group A: no cost recipe; group C: serialized + fractional qty).
+     * Reads are safe to run in parallel (no Oracle SEQ writes). One item read failing must
+     * NOT abort the whole check. Returns grouped warnings only; never blocks receiving.
+     * receivePO stays untouched. (Group B / orphan labels added once DW field names are
+     * confirmed on the test VM — see plan Task 1.)
+     */
+    async validateReceipt(input: { items: ValidateItemInput[] }): Promise<ValidateResult> {
+      // Dedup by arInvtId: the same item may appear on several PO lines.
+      const byId = new Map<number, ValidateItemInput>();
+      for (const it of input.items) {
+        if (Number.isFinite(it.arInvtId) && it.arInvtId > 0 && !byId.has(it.arInvtId)) byId.set(it.arInvtId, it);
+      }
+      const distinct = [...byId.values()];
+
+      const noRecipe: ReceiptWarning['items'] = [];
+      const unreliable: ReceiptWarning['items'] = [];
+      const serialFractional: ReceiptWarning['items'] = [];
+
+      await Promise.all(distinct.map(async (it) => {
+        try {
+          const meta = await inventory.getById(it.arInvtId);
+          const tag = { arInvtId: it.arInvtId, itemNumber: it.itemNumber };
+          if (meta?.hasRecipe === false) noRecipe.push(tag);
+          else if (!meta || meta.hasRecipe === undefined) unreliable.push(tag);
+          if (meta?.isSerialized && !Number.isInteger(it.quantity)) serialFractional.push(tag);
+        } catch (e: unknown) {
+          logger.warn({ arInvtId: it.arInvtId, err: errMsg(e) }, 'validateReceipt: item read failed, skipping');
+        }
+      }));
+
+      const warnings: ReceiptWarning[] = [];
+      if (noRecipe.length) {
+        warnings.push({ kind: 'NO_RECIPE', items: noRecipe,
+          message: `${noRecipe.length} stavki nema recept (Roll Inventory Cost) - prijem ce verovatno pasti za njih.` });
+      }
+      if (unreliable.length) {
+        warnings.push({ kind: 'RECIPE_UNRELIABLE', items: unreliable,
+          message: `Za ${unreliable.length} stavki provera recepta nije pouzdana (DW ne vraca tu informaciju).` });
+      }
+      if (serialFractional.length) {
+        warnings.push({ kind: 'SERIAL_FRACTIONAL', items: serialFractional,
+          message: `${serialFractional.length} serijalizovanih stavki ima razlomljenu kolicinu.` });
+      }
+      return { warnings };
     },
   };
 }
