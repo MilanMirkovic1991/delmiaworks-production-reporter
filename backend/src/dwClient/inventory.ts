@@ -9,6 +9,14 @@ export type InventoryItem = {
   rev: string;
   itemClass: string;
   isPurchased: boolean;
+  /**
+   * Cost-recipe signal for the pre-receive validator (group A).
+   * true/false when DW exposes a recipe field; undefined when no such field is
+   * present (signal unreliable - validator warns "nepouzdano" rather than guessing).
+   */
+  hasRecipe?: boolean;
+  /** true if the item is serial-tracked (group C: serialized + fractional qty). */
+  isSerialized?: boolean;
 };
 
 export type BomMaterial = {
@@ -29,6 +37,26 @@ const PURCHASED_CLASSES = new Set(['BUY', 'PUR', 'P']);
 function detectPurchased(itemClass: string | undefined): boolean {
   if (!itemClass) return false;
   return PURCHASED_CLASSES.has(itemClass.toUpperCase());
+}
+
+// Candidate DW field names for the recipe/serial signals. The FIRST key that
+// exists on the InventoryItem row wins. Confirm/narrow these against the DW test
+// VM (peek-inventory-item.ts) and move the real key to the front of each list.
+const RECIPE_KEYS = ['RecipeExists', 'HasRecipe', 'CostRecipeId', 'RecipeCardId'];
+const SERIAL_KEYS = ['Serialized', 'IsSerialized', 'SerialTracking', 'LotSerial'];
+
+/** Reads the first present key as a boolean; undefined when no candidate key is present. */
+function readBoolMeta(obj: Record<string, unknown>, keys: string[]): boolean | undefined {
+  for (const k of keys) {
+    if (k in obj) {
+      const v = obj[k];
+      if (typeof v === 'boolean') return v;
+      if (typeof v === 'number') return v > 0;
+      if (typeof v === 'string') return ['y', 'yes', 'true', '1'].includes(v.trim().toLowerCase());
+      return Boolean(v);
+    }
+  }
+  return undefined;
 }
 
 
@@ -72,6 +100,8 @@ export function makeInventoryApi(http: AxiosInstance) {
           rev: String(obj.Rev ?? ''),
           itemClass: String(cls ?? ''),
           isPurchased: detectPurchased(cls),
+          hasRecipe: readBoolMeta(obj, RECIPE_KEYS),
+          isSerialized: readBoolMeta(obj, SERIAL_KEYS) ?? false,
         };
       } catch (e: unknown) {
         if (e && typeof e === 'object' && 'response' in e) {
