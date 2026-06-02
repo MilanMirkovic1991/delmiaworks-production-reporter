@@ -22,26 +22,18 @@ vi.mock('../../src/api/client.js', () => ({
       },
       stats: { nodeCount: 2, maxDepth: 1, cycleCount: 0, totalWorkOrders: 0, itemsWithoutWO: 0 },
     })),
-    validateReceipt: vi.fn(async () => ({ poId: 999, warnings: [] })),
     createPO: vi.fn(async () => ({
       poId: 999, poNo: 'PO-1', approved: true,
       lineItems: [{ arInvtId: 2, quantity: 5, success: true, poDetailId: 5001, releaseId: 7001 }],
     })),
-    receivePO: vi.fn(async () => ({
+    validateReceipt: vi.fn(async () => ({
       poId: 999,
-      receipts: [{
-        poDetailId: 5001, poReleaseId: 7001, arInvtId: 1, itemNumber: 'PART-A', qtyReceived: 5,
-        success: false, poReceiptId: 9001,
-        error: 'PostPOReceiptAndUpdateMasterLabel failed: boom',
-      }],
+      warnings: [
+        { kind: 'NO_RECIPE', message: '1 stavki nema recept (Roll Inventory Cost).', items: [{ arInvtId: 2, itemNumber: 'BUY-X' }] },
+      ],
     })),
-    retryReceipts: vi.fn(async () => ({
-      poId: 999,
-      receipts: [{
-        poDetailId: 5001, poReleaseId: 7001, arInvtId: 1, itemNumber: 'PART-A', qtyReceived: 5,
-        success: true, poReceiptId: 9001, lotNo: 1, serialNo: '0000001', fgMultiId: 4001, masterLabelId: 8001,
-      }],
-    })),
+    receivePO: vi.fn(async () => ({ poId: 999, receipts: [] })),
+    retryReceipts: vi.fn(async () => ({ poId: 999, receipts: [] })),
   },
 }));
 
@@ -60,7 +52,7 @@ function renderPage() {
   );
 }
 
-describe('WorkOrdersPage retry flow', () => {
+describe('WorkOrdersPage pre-receive validator panel', () => {
   beforeEach(() => {
     useWizardStore.getState().reset();
     vi.spyOn(window, 'confirm').mockReturnValue(true);
@@ -68,31 +60,29 @@ describe('WorkOrdersPage retry flow', () => {
   });
   afterEach(() => { vi.restoreAllMocks(); });
 
-  it('shows a "Ponovi" button on a failed row, retries it, and turns it into a success', async () => {
+  it('auto-validates on PO create, shows the grouped warning, and keeps the receive button enabled', async () => {
     const user = userEvent.setup();
     renderPage();
     await waitFor(() => screen.getByText('PART-A'));
 
-    // Select the purchased component so the "Kreiraj PO" button enables.
     await user.click(screen.getByRole('checkbox', { name: /selektuj sve/i }));
-
-    // Create the PO, then receive it (both behind confirm() which we stubbed true).
     await user.click(screen.getByRole('button', { name: /kreiraj po/i }));
-    await user.click(await screen.findByRole('button', { name: /prijem na default/i }));
 
-    // The failed row must expose a per-row "Ponovi" button and the batch button.
-    const retryBtn = await screen.findByRole('button', { name: /^ponovi$/i });
-    expect(retryBtn).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /ponovi sve neuspele/i })).toBeInTheDocument();
-
-    // Click "Ponovi" → api.retryReceipts called with the carried poReceiptId + priorError.
-    await user.click(retryBtn);
-    await waitFor(() => expect(api.retryReceipts).toHaveBeenCalledWith(999, [
-      expect.objectContaining({ poDetailId: 5001, poReleaseId: 7001, poReceiptId: 9001, priorError: 'PostPOReceiptAndUpdateMasterLabel failed: boom' }),
+    // Validation fires automatically with the created line items (itemNumber resolved from the BOM).
+    await waitFor(() => expect(api.validateReceipt).toHaveBeenCalledWith(999, [
+      { arInvtId: 2, itemNumber: 'BUY-X', quantity: 5 },
     ]));
 
-    // Row becomes success: no more "Ponovi", no more batch button.
-    await waitFor(() => expect(screen.queryByRole('button', { name: /^ponovi$/i })).toBeNull());
-    expect(screen.queryByRole('button', { name: /ponovi sve neuspele/i })).toBeNull();
+    // The grouped warning message is shown.
+    await waitFor(() => screen.getByText(/nema recept/i));
+
+    // Receive button is present and NOT disabled by the panel.
+    const receiveBtn = screen.getByRole('button', { name: /prijem na default/i });
+    expect(receiveBtn).not.toBeDisabled();
+
+    // Expanding the group reveals the affected item number.
+    const details = screen.getByText(/nema recept/i).closest('details');
+    expect(details).toBeTruthy();
+    expect(details!.textContent).toContain('BUY-X');
   });
 });

@@ -7,6 +7,7 @@ import { useWizardStore } from '../../src/store/wizardStore.js';
 
 vi.mock('../../src/api/client.js', () => ({
   api: {
+    validateReceipt: vi.fn(async () => ({ poId: 999, warnings: [] })),
     createPO: vi.fn(async () => ({ poId: 0, poNo: null, lineItems: [] })),
     workOrderTree: vi.fn(async () => ({
       tree: {

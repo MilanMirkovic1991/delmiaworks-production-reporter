@@ -75,6 +75,27 @@ export function WorkOrdersPage() {
     ? new Set(retryMutation.variables.map(rowKey))
     : new Set<string>();
 
+  // Pre-receive validator: auto-runs once a PO is created and shows a grouped warning
+  // panel above the receive button. Item numbers come from the BOM (createPO line items
+  // don't carry them). The panel only warns — it never disables the receive button.
+  const buyMap = useMemo(
+    () => new Map(purchaseItems.map(i => [i.arInvtId, i.itemNumber] as const)),
+    [purchaseItems],
+  );
+  const validateMutation = useMutation({
+    mutationFn: (items: Array<{ arInvtId: number; itemNumber: string; quantity: number }>) =>
+      api.validateReceipt(poId!, items),
+  });
+  useEffect(() => {
+    const created = createPOMutation.data;
+    if (!created) return;
+    const items = created.lineItems
+      .filter(l => l.success)
+      .map(l => ({ arInvtId: l.arInvtId, itemNumber: buyMap.get(l.arInvtId) ?? '', quantity: l.quantity }));
+    if (items.length > 0) validateMutation.mutate(items);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [createPOMutation.data]);
+
   function toggleAllBuy() {
     if (allBuySelected) setSelectedToBuy(new Set());
     else setSelectedToBuy(new Set(purchaseItems.map(i => i.arInvtId)));
@@ -183,6 +204,38 @@ export function WorkOrdersPage() {
                               ))}
                             </ul>
                           </details>
+                        )}
+
+                        {validateMutation.isPending && (
+                          <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 8 }}>Proveravam stavke...</p>
+                        )}
+                        {validateMutation.isError && (
+                          <p style={{ color: 'var(--warning)', fontSize: 13, marginTop: 8 }}>
+                            Provera stavki nije uspela — prijem je i dalje moguć.
+                          </p>
+                        )}
+                        {validateMutation.isSuccess && validateMutation.data.warnings.length === 0 && (
+                          <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 8 }}>
+                            Nema upozorenja — sve stavke izgledaju spremne za prijem.
+                          </p>
+                        )}
+                        {validateMutation.isSuccess && validateMutation.data.warnings.length > 0 && (
+                          <div className="card" style={{ background: '#fef9c3', border: '1px solid var(--warning)', marginTop: 8 }}>
+                            <strong>⚠ Upozorenja pre prijema</strong>
+                            <p style={{ fontSize: 12, color: 'var(--muted)', margin: '4px 0' }}>
+                              Informativno — prijem nije blokiran.
+                            </p>
+                            {validateMutation.data.warnings.map(w => (
+                              <details key={w.kind} style={{ marginTop: 6 }}>
+                                <summary>{w.message}</summary>
+                                <ul>
+                                  {w.items.map(it => (
+                                    <li key={it.arInvtId}>{it.itemNumber || `arInvtId ${it.arInvtId}`}</li>
+                                  ))}
+                                </ul>
+                              </details>
+                            ))}
+                          </div>
                         )}
 
                         <div className="row" style={{ marginTop: 12, gap: 8 }}>
