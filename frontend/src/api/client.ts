@@ -26,6 +26,14 @@ export type RetryRow = {
   priorError?: string;
 };
 
+export type WarningKind = 'NO_RECIPE' | 'RECIPE_UNRELIABLE' | 'ORPHAN_LABEL' | 'SERIAL_FRACTIONAL';
+
+export type ReceiptWarning = {
+  kind: WarningKind;
+  message: string;
+  items: Array<{ arInvtId: number; itemNumber: string }>;
+};
+
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, { credentials: 'include', ...init });
   if (!res.ok) {
@@ -80,5 +88,11 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ rows }),
+    }),
+  validateReceipt: (poId: number, items: Array<{ arInvtId: number; itemNumber: string; quantity: number }>) =>
+    req<{ poId: number; warnings: ReceiptWarning[] }>(`/api/po/${poId}/receive-validate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items }),
     }),
 };
