@@ -33,21 +33,27 @@ Node ≥ 20, TypeScript, Vitest.
 
 ## Trenutno stanje (slika za nastavak — ažuriraj na kraju dana)
 
-- **2026-06-04: nabavka i prijem UKLONJENI.** App se sada završava na stablu radnih naloga.
-  Komiti: `cdad354` (keeper: `extractDwFriendlyMessage`), `4c77771` (remove procurement).
-  Testovi: **backend 69/69, frontend 14/14** zeleno. Frontend build čist; backend `tsc` čist
-  osim PRE-POSTOJEĆE pino-http greške u `server.ts` (nije naša, ne utiče na dev/test).
-- E2E lanac koji radi: login → SO lista → stavka SO → Release (izbor pune količine ili
-  pojedinačnih release-ova) → stablo radnih naloga (prikaz + statistika). `WorkOrderTreeNodeView`
-  ima po WO dugme „▶ Prijavi proizvodnju" (zasad samo `alert` „Faza 2, uskoro" — seme za Phase 4).
-- Faze: Phase 1 GOTOVA. Phase 2 (kreiranje WO) / Phase 4 (prijava proizvodnje) / Phase 5 NISU
-  počele. Phase 3 (nabavka/prijem) + validator + retry UKLONJENI — više nisu deo proizvoda.
+- **2026-06-04: Phase 4 (kaskadna prijava proizvodnje) IMPLEMENTIRANA** (commit `489db8c`),
+  čeka živi test korisnika. Klik „Prijavi proizvodnju" na čvoru prijavi taj WO + ceo podstablo,
+  od dna ka vrhu, preko DW `ReportProductionByWorkOrder`. Po WO: `WorkOrderEx.ProductionHours`
+  (standard) → ±15% jitter; `goodPartsQty` = puna `Quantity`; `lotNo` prazno (DW auto).
+  Read-only dry-run prema VM-u potvrdio mapiranja na pravim podacima (57 WO za eplant 13).
+  Testovi: **backend 90/90, frontend 16/16** zeleno. Frontend build čist; backend `tsc` čist osim
+  PRE-POSTOJEĆE pino-http greške.
+- **2026-06-04 (ranije): nabavka i prijem UKLONJENI** (`4c77771`); keeper `extractDwFriendlyMessage` (`cdad354`).
+- E2E lanac: login → SO lista → stavka SO → Release (količina) → stablo radnih naloga; na svakom
+  WO dugme „▶ Prijavi proizvodnju" pokreće kaskadu (potvrda pre upisa), status ✓/✗ po WO u stablu.
+- Faze: Phase 1 GOTOVA; **Phase 4 IMPLEMENTIRANA (čeka živi test).** Phase 2 (kreiranje WO) /
+  Phase 5 NISU počele. Phase 3 (nabavka/prijem) + validator + retry UKLONJENI.
 
 ### Sledeći korak
 
-- **Phase 4 — prijava proizvodnje od dna stabla ka vrhu.** Brainstorm → spec → plan pre koda.
-  Spec uklanjanja (referenca): `docs/superpowers/specs/2026-06-04-remove-procurement-design.md`.
-  Ako nabavka/prijem ikad zatrebaju nazad — vraćaju se `git revert 4c77771`.
+- **Živi test Phase 4** (korisnik): na test VM-u kliknuti kaskadu na jednom artiklu, proveriti da
+  DW „Report Production By Work Order" prikazuje prijavljene količine i da je vreme variralo ±15%.
+- Otvoreno za dораду posle testa: `lotNo` (sad prazno → DW auto; možda treba pravi lot),
+  opcija „preostala umesto pune količine", živa progresija dok kaskada traje (sad rezime na kraju).
+- Spec: `docs/superpowers/specs/2026-06-04-production-reporting-cascade-design.md`.
+  Ako nabavka/prijem ikad zatrebaju nazad — `git revert 4c77771`.
 
 ### Otvoreni problemi / blokeri
 
@@ -62,6 +68,17 @@ Node ≥ 20, TypeScript, Vitest.
 
 ## Changelog (dopisuj najnovije na vrh)
 
+- **2026-06-04 (Phase 4)** — Kaskadna prijava proizvodnje, TDD, commit `489db8c`. Otkriven DW
+  WebAPI read-only probom test VM-a: `GET WorkOrders/WorkOrderEx/{woId}` → `ProductionHours`;
+  `GET ReportProductionByWorkOrder/WorkOrder/{eplant}?workOrderId` → `Quantity`; `POST
+  ReportProductionByWorkOrder/GoodPartsQuantityDisposition/{eplant}?workOrderId&goodPartsQty&
+  productionHours&lotNo`. Klik na čvor → `flattenBottomUp` (post-order, preskače kupovne/cikluse)
+  → po WO sekvencijalno: čitaj standard → `jitterHours` ±15% → POST puna `Quantity`. Auth greška
+  staje, DW greška nastavlja (`runCascade`). Nove jedinice: `dwClient/production.ts`,
+  `services/productionCascade.ts`, `routes/production.ts` (`POST /api/production/report-cascade`);
+  vraćen `looksLikeAuthError`; frontend `reportProductionCascade` + dugme na WO + status ✓/✗ po WO.
+  Read-only dry-run potvrdio mapiranja (WO 1342: std 1.0688 h, qty 32). Testovi: backend 90/90,
+  frontend 16/16. NIJE još živi test (pravi upis u DW).
 - **2026-06-04** — Uklonjeni nabavka i prijem (Phase 3 + pre-receive validator + retry), po
   odluci da se fokus svede isključivo na prijavu proizvodnje. Obrisano: `dwClient/po.ts`,
   `routes/po.ts`, `utils/collectPurchased.ts`, `utils/classifyReceiptError.ts` + 11 test fajlova;
