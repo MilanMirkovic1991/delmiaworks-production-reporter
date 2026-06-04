@@ -418,7 +418,7 @@ tr.selected-row:hover { background: var(--accent-soft); }
   gap: 20px;
   align-items: start;
 }
-.wo-tree-section h3, .wo-purchase-section h3 {
+.wo-tree-section h3, .wo-failures-section h3 {
   margin: 0 0 12px;
 }
 .wo-tree-scroll {
@@ -430,19 +430,37 @@ tr.selected-row:hover { background: var(--accent-soft); }
   background: var(--surface);
   box-shadow: var(--shadow-xs);
 }
-.wo-purchase-section {
+.wo-failures-section {
   position: sticky;
   top: 76px;
 }
-.wo-purchase-section table {
-  max-height: 60vh;
-  display: block;
+.failures-list {
+  max-height: 72vh;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.failure-item {
+  border-left: 3px solid var(--error);
+  padding: 10px 12px;
+}
+.failure-item-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.failure-reason {
+  font-size: 12px;
+  color: var(--error);
+  word-break: break-word;
 }
 
 @media (max-width: 1100px) {
   .wo-layout { grid-template-columns: 1fr; }
-  .wo-purchase-section { position: static; }
+  .wo-failures-section { position: static; }
   .wo-tree-scroll { max-height: none; }
 }
 

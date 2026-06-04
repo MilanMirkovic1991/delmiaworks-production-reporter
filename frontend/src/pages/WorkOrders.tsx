@@ -6,6 +6,7 @@ import type { WorkOrderTreeNode } from '../api/types.js';
 import { useWizardStore } from '../store/wizardStore.js';
 import { WizardStepper } from '../components/WizardStepper.js';
 import { WorkOrderTreeNodeView } from '../components/WorkOrderTreeNode.js';
+import { FailuresPanel } from '../components/FailuresPanel.js';
 
 export function WorkOrdersPage() {
   const navigate = useNavigate();
@@ -99,18 +100,22 @@ export function WorkOrdersPage() {
             </div>
           )}
 
-          <section className="wo-tree-section">
-            <h3>Stablo radnih naloga</h3>
-            <div className="wo-tree-scroll">
-              <WorkOrderTreeNodeView
-                node={data.tree}
-                defaultExpanded
-                onReport={onReport}
-                resultsByWo={resultsByWo}
-                reporting={cascade.isPending}
-              />
-            </div>
-          </section>
+          <div className="wo-layout">
+            <section className="wo-tree-section">
+              <h3>Stablo radnih naloga</h3>
+              <div className="wo-tree-scroll">
+                <WorkOrderTreeNodeView
+                  node={data.tree}
+                  defaultExpanded
+                  onReport={onReport}
+                  resultsByWo={resultsByWo}
+                  reporting={cascade.isPending}
+                />
+              </div>
+            </section>
+
+            <FailuresPanel results={cascade.data?.results ?? null} />
+          </div>
         </>
       )}
 
