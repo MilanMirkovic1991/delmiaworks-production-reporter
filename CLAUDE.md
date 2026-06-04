@@ -78,6 +78,16 @@ Node ≥ 20, TypeScript, Vitest.
 
 ## Changelog (dopisuj najnovije na vrh)
 
+- **2026-06-04 (multiselect SO + auto-login)** — Prva strana sad multiselektuje prodajne
+  porudžbine; nova `AggregatePage` objedinjuje potražnju **PO ARTIKLU** (arInvtId) preko izabranih
+  SO, sa izborom po stavci „puna" ili konkretni release-ovi (i preko više SO). Rezultat = plan
+  proizvodnje (1 red po artiklu) → `ProducePlanPage` (1 artikal otvori direktno, više = lista) →
+  postojeće WO stablo + kaskada NETAKNUTI. `Login` se auto-loguje na mount (test kredencijali →
+  eplant 13 → SO liste); na grešci prikaže popunjenu formu (fallback). Nove jedinice:
+  `utils/aggregateDemand` (TDD), `AggregatePage`, `AggregateLineItem`, `ProducePlanPage`; store
+  +`selectedSOs`/`producePlan`/`activatePart`; rute `/aggregate` `/produce`. Stari `SalesOrderItems`/
+  `Releases` ostali netaknuti. Testovi: frontend 30/30, backend 90/90. Tag `stabilno-kaskada-2026-06-04`
+  = povratna tačka pre ove izmene. Commit `e1604f8`.
 - **2026-06-04 (Phase 4 živi test)** — Kaskada pada na serijskim komponentama. Razloženo probom
   test VM-a: artikli klase „IN" (potrošni, razlomljena BOM količina, npr. `097327103`, lot
   MasterLabelId 136 / serijski 0000114 / 100000 kom / LocId 27029) bili su serijski; DW ne da da
