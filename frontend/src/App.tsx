@@ -5,6 +5,8 @@ import { SelectEPlant } from './pages/SelectEPlant.js';
 import { SalesOrdersList } from './pages/SalesOrdersList.js';
 import { SalesOrderItems } from './pages/SalesOrderItems.js';
 import { ReleasesPage } from './pages/Releases.js';
+import { AggregatePage } from './pages/AggregatePage.js';
+import { ProducePlanPage } from './pages/ProducePlanPage.js';
 import { WorkOrdersPage } from './pages/WorkOrders.js';
 import { ProtectedRoute } from './components/ProtectedRoute.js';
 
@@ -22,6 +24,8 @@ export function App() {
           <Route path="/" element={<ProtectedRoute><SalesOrdersList /></ProtectedRoute>} />
           <Route path="/sales-order/items" element={<ProtectedRoute><SalesOrderItems /></ProtectedRoute>} />
           <Route path="/releases" element={<ProtectedRoute><ReleasesPage /></ProtectedRoute>} />
+          <Route path="/aggregate" element={<ProtectedRoute><AggregatePage /></ProtectedRoute>} />
+          <Route path="/produce" element={<ProtectedRoute><ProducePlanPage /></ProtectedRoute>} />
           <Route path="/work-orders" element={<ProtectedRoute><WorkOrdersPage /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>

@@ -647,3 +647,10 @@ tr.selected-row:hover { background: var(--accent-soft); }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--muted-2); }
+
+/* Aggregation (multiselect SO -> quantity) screen */
+.agg-line { padding: 8px 0; border-top: 1px solid var(--border); }
+.agg-line:first-child { border-top: none; }
+.agg-line-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.agg-line-modes { margin-left: auto; display: flex; gap: 14px; font-size: 13px; white-space: nowrap; }
+.agg-releases { margin: 6px 0 4px 18px; font-size: 13px; }

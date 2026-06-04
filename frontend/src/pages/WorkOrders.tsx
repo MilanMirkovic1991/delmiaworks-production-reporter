@@ -13,7 +13,9 @@ export function WorkOrdersPage() {
   const so = useWizardStore(s => s.selectedSO);
   const lineItem = useWizardStore(s => s.selectedLineItem);
   const finalQty = useWizardStore(s => s.finalQty);
+  const producePlan = useWizardStore(s => s.producePlan);
   const reset = useWizardStore(s => s.reset);
+  const backTo = producePlan.length > 1 ? '/produce' : '/releases';
 
   useEffect(() => {
     if (!so || !lineItem || finalQty <= 0) navigate('/');
@@ -120,7 +122,7 @@ export function WorkOrdersPage() {
       )}
 
       <div className="row" style={{ marginTop: 16 }}>
-        <button onClick={() => navigate('/releases')}>← Nazad</button>
+        <button onClick={() => navigate(backTo)}>← Nazad</button>
       </div>
     </div>
   );

@@ -66,6 +66,26 @@ describe('wizardStore', () => {
     expect(useWizardStore.getState().finalQty).toBe(0);
   });
 
+  it('setSelectedSOs / setProducePlan store the multiselect + plan; reset clears them', () => {
+    useWizardStore.getState().setSelectedSOs([{ salesOrderId: 1, orderNumber: 'SO1', company: 'Acme' }]);
+    useWizardStore.getState().setProducePlan([{ arInvtId: 9, itemNumber: 'P-9', description: 'x', qty: 30 }]);
+    expect(useWizardStore.getState().selectedSOs).toHaveLength(1);
+    expect(useWizardStore.getState().producePlan[0]?.qty).toBe(30);
+    useWizardStore.getState().reset();
+    expect(useWizardStore.getState().selectedSOs).toEqual([]);
+    expect(useWizardStore.getState().producePlan).toEqual([]);
+  });
+
+  it('activatePart wires a plan part into the existing /work-orders fields', () => {
+    useWizardStore.getState().activatePart({ arInvtId: 5, itemNumber: 'PART-5', description: 'Five', qty: 120 });
+    const s = useWizardStore.getState();
+    expect(s.step).toBe(4);
+    expect(s.finalQty).toBe(120);
+    expect(s.selectedLineItem?.arInvtId).toBe(5);
+    expect(s.selectedLineItem?.totalOrdered).toBe(120);
+    expect(s.selectedSO).toBeDefined(); // synthetic SO so WorkOrders renders
+  });
+
   it('Puna količina = lineItem.totalOrdered', () => {
     useWizardStore.getState().selectSO({
       salesOrderId: 42, orderNumber: 'SO1001', company: 'Acme', customerNumber: 'C001',
