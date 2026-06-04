@@ -82,7 +82,7 @@ Node ≥ 20, TypeScript, Vitest.
   test VM-a: artikli klase „IN" (potrošni, razlomljena BOM količina, npr. `097327103`, lot
   MasterLabelId 136 / serijski 0000114 / 100000 kom / LocId 27029) bili su serijski; DW ne da da
   se skine delić serijskog lota (`FloorDispositionEx` → „Partial is disabled"; auto-backflush →
-  „Insufficient inventory", regular pool 0). DW master-data kontradikcija (ista klasa kao stara
+  „Insufficient inventory"; stanje stoji pod lotom a ne kao slobodno za trošenje). DW master-data kontradikcija (ista klasa kao stara
   „grupa C"), ne kod. **Odluka: skinuti serijalizaciju, raditi striktno bez nje** — aplikacija bez
   izmene; čim nije serijsko, auto-backflush prolazi. Sve probe atomarno poništene (ništa upisano).
 - **2026-06-04 (Phase 4)** — Kaskadna prijava proizvodnje, TDD, commit `489db8c`. Otkriven DW
