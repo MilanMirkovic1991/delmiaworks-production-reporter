@@ -12,3 +12,8 @@ backend/tools/
 coverage/
 .vscode/
 .idea/
+
+# Pricing spreadsheets — keep local only; only the Cene.7z archive goes to git
+Cene.xlsx
+Cene_popunjen.xlsx
+Cene/
