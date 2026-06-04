@@ -48,7 +48,11 @@ Node ≥ 20, TypeScript, Vitest.
 
 ### Sledeći korak
 
-- **Živi test Phase 4 (2026-06-04) — uzrok pada razložen, odluka doneta.** Kaskada pada na
+- **2026-06-04: Phase 4 POTVRĐENO RADI od kraja do kraja.** Po de-serijalizaciji, kontrolna
+  minimalna prijava na test VM-u USPELA — `GoodPartsQuantityDisposition` za WO 1305 prošla
+  (QuantityReported 0→1). Prvi potvrđen uspešan upis; kaskada radi. (Napomena: ta 1 test-jedinica
+  je sad prijavljena na WO 1305 u test bazi.) Korisnik može da pokrene pun živi test.
+- **Pozadina pada pre de-serijalizacije:** kaskada je padala na
   serijskim komponentama: artikli klase „IN" (potrošni, troše se u delićima, npr. `097327103`)
   bili su **serijski**, a DW ZABRANJUJE skidanje delića serijskog lota (`FloorDispositionEx` →
   „Duplicate scan or Partial is disabled!"; auto-backflush → „Insufficient inventory", regular
