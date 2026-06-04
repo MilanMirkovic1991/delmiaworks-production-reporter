@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { FailuresPanel } from '../../src/components/FailuresPanel.js';
 import type { CascadeResult } from '../../src/api/client.js';
 
@@ -10,35 +10,40 @@ function fail(workOrderId: number, itemNumber: string, error: string): CascadeRe
   return { workOrderId, mfgNumber: `WO-${workOrderId}`, itemNumber, arInvtId: workOrderId, goodPartsQty: 0, productionHours: 0, success: false, error };
 }
 
-describe('FailuresPanel', () => {
-  it('before any cascade run, shows a hint to run reporting', () => {
-    render(<FailuresPanel results={null} />);
-    expect(screen.getByText(/Pokreni/i)).toBeInTheDocument();
-    expect(screen.queryByText(/✓/)).toBeNull();
-  });
+describe('FailuresPanel (on-demand)', () => {
+  it('is collapsed by default — failures appear only after clicking the toggle', () => {
+    render(<FailuresPanel results={[ok(1, 'PART-A'), fail(2, 'SUB', 'Insufficient inventory. Item No: 097327103'), fail(3, 'NUT', 'No recipe card found')]} />);
+    // collapsed: the toggle shows the count, but the list is NOT rendered yet
+    const toggle = screen.getByRole('button', { name: /Neuspešne prijave \(2\)/ });
+    expect(toggle).toBeInTheDocument();
+    expect(screen.queryByText('SUB')).toBeNull();
 
-  it('when everything passed, shows an all-clear message and count 0', () => {
-    render(<FailuresPanel results={[ok(1, 'PART-A'), ok(2, 'SUB')]} />);
-    expect(screen.getByText(/Neuspešne prijave \(0\)/)).toBeInTheDocument();
-    expect(screen.getByText(/sve.*pro[šs]l/i)).toBeInTheDocument();
-  });
-
-  it('lists each failed work order with item number, WO number and the reason', () => {
-    const results = [
-      ok(1, 'PART-A'),
-      fail(2, 'SUB', 'Insufficient inventory of consumed components. Item No: 097327103'),
-      fail(3, 'NUT', 'No recipe card found'),
-    ];
-    render(<FailuresPanel results={results} />);
-    expect(screen.getByText(/Neuspešne prijave \(2\)/)).toBeInTheDocument();
-    // failed items appear with their reasons
+    // click to reveal
+    fireEvent.click(toggle);
     expect(screen.getByText('SUB')).toBeInTheDocument();
     expect(screen.getByText(/097327103/)).toBeInTheDocument();
     expect(screen.getByText('NUT')).toBeInTheDocument();
     expect(screen.getByText(/No recipe card found/)).toBeInTheDocument();
-    // WO numbers shown to locate them
     expect(screen.getByText(/WO-2/)).toBeInTheDocument();
-    // the successful one is NOT listed
+    // the successful one is never listed
     expect(screen.queryByText('PART-A')).toBeNull();
+
+    // click again to collapse
+    fireEvent.click(toggle);
+    expect(screen.queryByText('SUB')).toBeNull();
+  });
+
+  it('before any cascade run, the toggle opens to a hint', () => {
+    render(<FailuresPanel results={null} />);
+    const toggle = screen.getByRole('button', { name: /Neuspešne prijave/i });
+    fireEvent.click(toggle);
+    expect(screen.getByText(/Pokreni/i)).toBeInTheDocument();
+  });
+
+  it('when everything passed, the toggle shows (0) and opens to an all-clear', () => {
+    render(<FailuresPanel results={[ok(1, 'PART-A'), ok(2, 'SUB')]} />);
+    const toggle = screen.getByRole('button', { name: /Neuspešne prijave \(0\)/ });
+    fireEvent.click(toggle);
+    expect(screen.getByText(/sve.*pro[šs]l/i)).toBeInTheDocument();
   });
 });

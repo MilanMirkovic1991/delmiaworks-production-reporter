@@ -434,6 +434,31 @@ tr.selected-row:hover { background: var(--accent-soft); }
   position: sticky;
   top: 76px;
 }
+.failures-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  font-weight: 600;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  cursor: pointer;
+}
+.failures-toggle:hover { background: var(--surface-2); }
+.failures-caret { color: var(--muted); }
+.failures-badge {
+  margin-left: auto;
+  background: var(--error);
+  color: #fff;
+  border-radius: 999px;
+  padding: 0 8px;
+  font-size: 12px;
+  line-height: 18px;
+}
+.failures-body { margin-top: 8px; }
 .failures-list {
   max-height: 72vh;
   overflow-y: auto;
