@@ -5,7 +5,6 @@ import { makeSalesOrdersApi } from './salesOrders.js';
 import { makeBomApi } from './bom.js';
 import { makeWorkOrdersApi } from './workOrders.js';
 import { makeEPlantsApi } from './eplants.js';
-import { makePOApi } from './po.js';
 import { DwClientConfig } from './types.js';
 
 export function createDwClient(cfg: DwClientConfig) {
@@ -23,7 +22,6 @@ export function createDwClient(cfg: DwClientConfig) {
     bom: makeBomApi(http),
     workOrders: makeWorkOrdersApi(http),
     eplants: makeEPlantsApi(http),
-    po: makePOApi(http),
   };
 }
 

@@ -1,39 +1,5 @@
 import type { Me, Item, SalesOrderRow, Release, BomTreeResponse, SalesOrderSummary, SalesOrderLineItem, WorkOrderRow, WorkOrderTreeResponse, EPlant } from './types.js';
 
-export type ReceiptRow = {
-  poDetailId: number;
-  poReleaseId: number;
-  arInvtId: number;
-  itemNumber: string;
-  qtyReceived: number;
-  lotNo?: number;
-  /** MASTER_LABEL.SERIALNO sent to DW (7-digit padded, globally sequential). */
-  serialNo?: string;
-  success: boolean;
-  poReceiptId?: number;
-  fgMultiId?: number;
-  masterLabelId?: number;
-  error?: string;
-};
-
-export type RetryRow = {
-  poDetailId: number;
-  poReleaseId: number;
-  arInvtId: number;
-  itemNumber: string;
-  qtyReceived: number;
-  poReceiptId?: number;
-  priorError?: string;
-};
-
-export type WarningKind = 'NO_RECIPE' | 'RECIPE_UNRELIABLE' | 'ORPHAN_LABEL' | 'SERIAL_FRACTIONAL';
-
-export type ReceiptWarning = {
-  kind: WarningKind;
-  message: string;
-  items: Array<{ arInvtId: number; itemNumber: string }>;
-};
-
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, { credentials: 'include', ...init });
   if (!res.ok) {
@@ -69,30 +35,4 @@ export const api = {
     req<{ workOrders: WorkOrderRow[] }>(`/api/work-orders?arInvtId=${arInvtId}`),
   workOrderTree: (arInvtId: number, qty: number) =>
     req<WorkOrderTreeResponse>(`/api/work-order-tree?arInvtId=${arInvtId}&qty=${qty}`),
-  createPO: (items: Array<{ arInvtId: number; quantity: number }>) =>
-    req<{
-      poId: number;
-      poNo: string | null;
-      approved: boolean;
-      approvalError?: string;
-      lineItems: Array<{ arInvtId: number; quantity: number; success: boolean; poDetailId?: number; releaseId?: number; error?: string }>;
-    }>('/api/po/create', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items }),
-    }),
-  receivePO: (poId: number) =>
-    req<{ poId: number; receipts: ReceiptRow[] }>(`/api/po/${poId}/receive`, { method: 'POST' }),
-  retryReceipts: (poId: number, rows: RetryRow[]) =>
-    req<{ poId: number; receipts: ReceiptRow[] }>(`/api/po/${poId}/receive-retry`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rows }),
-    }),
-  validateReceipt: (poId: number, items: Array<{ arInvtId: number; itemNumber: string; quantity: number }>) =>
-    req<{ poId: number; warnings: ReceiptWarning[] }>(`/api/po/${poId}/receive-validate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items }),
-    }),
 };

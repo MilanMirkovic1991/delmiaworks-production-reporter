@@ -7,8 +7,6 @@ import { useWizardStore } from '../../src/store/wizardStore.js';
 
 vi.mock('../../src/api/client.js', () => ({
   api: {
-    validateReceipt: vi.fn(async () => ({ poId: 999, warnings: [] })),
-    createPO: vi.fn(async () => ({ poId: 0, poNo: null, lineItems: [] })),
     workOrderTree: vi.fn(async () => ({
       tree: {
         arInvtId: 1, itemNumber: 'PART-A', description: 'Widget A', rev: '1', itemClass: 'MFG',
@@ -63,9 +61,9 @@ describe('WorkOrdersPage', () => {
     expect(screen.getByText(/WO-1000/)).toBeInTheDocument();   // root WO
     expect(screen.getByText('SUB')).toBeInTheDocument();
     expect(screen.getByText(/WO-2000/)).toBeInTheDocument();   // sub WO
-    // NUT now appears twice: once in the tree (purchased leaf) and once in the inline Purchase table
+    // NUT is the purchased leaf, shown once in the tree
     expect(screen.getAllByText('NUT').length).toBeGreaterThanOrEqual(1);
-    // Per-WO "Prijavi" buttons (one per WO in the mock = 2)
+    // Per-WO "Prijavi proizvodnju" buttons (one per WO in the mock = 2)
     const buttons = screen.getAllByRole('button', { name: /pokreni prijavu/i });
     expect(buttons).toHaveLength(2);
     expect(buttons[0]).toBeEnabled();
@@ -78,14 +76,12 @@ describe('WorkOrdersPage', () => {
     expect(screen.queryByText(/nema radnog naloga/i)).toBeNull();
   });
 
-  it('renders inline Purchase section with the purchased leaf', async () => {
+  it('no longer renders any procurement UI', async () => {
     renderPage();
     await waitFor(() => screen.getByText('PART-A'));
-    // The new inline section heading
-    expect(screen.getByRole('heading', { name: /kupovne komponente za nabavku/i })).toBeInTheDocument();
-    // The Create PO button exists (initially disabled because nothing is selected).
-    // 'Prijem na default lokaciju' is now inside the PO success card and only renders after a PO is created.
-    expect(screen.getByRole('button', { name: /kreiraj po/i })).toBeInTheDocument();
+    // Procurement was removed: no purchase section, no PO/receive buttons.
+    expect(screen.queryByRole('heading', { name: /kupovne komponente za nabavku/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /kreiraj po/i })).toBeNull();
     expect(screen.queryByRole('button', { name: /prijem na default/i })).toBeNull();
   });
 });
