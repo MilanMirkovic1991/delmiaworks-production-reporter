@@ -78,8 +78,9 @@ describe('POST /api/production/report-cascade', () => {
     expect(Number(post601.productionHours)).toBeLessThanOrEqual(4 * 1.15 + 1e-6);
     expect(Number(post501.productionHours)).toBeGreaterThanOrEqual(8 * 0.85 - 1e-6);
     expect(Number(post501.productionHours)).toBeLessThanOrEqual(8 * 1.15 + 1e-6);
-    // lotNo left empty for DW to assign
-    expect(post601.lotNo).toBe('');
+    // produced lot of each component = the work-order number being reported
+    expect(post601.lotNo).toBe('WO-601');
+    expect(post501.lotNo).toBe('WO-501');
   });
 
   it('stops the cascade when DW returns an auth error mid-run', async () => {

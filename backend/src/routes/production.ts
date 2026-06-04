@@ -55,7 +55,11 @@ export function makeProductionRouter(store: SessionStore, rng: () => number = Ma
         const std = await dw.production.getWorkOrderEx(woId);
         const goodPartsQty = reportable?.quantity ?? 0;
         const productionHours = jitterHours(std?.productionHours ?? 0, rng);
-        await dw.production.reportGoodParts({ eplantId, workOrderId: woId, goodPartsQty, productionHours, lotNo: '' });
+        // The produced component's lot number IS the work-order number being reported.
+        // (DW backflushes the BOM components on disposition; because we report bottom-up,
+        // each child already exists under its own WO-number lot for the parent to consume.)
+        const lotNo = cwo.workOrder.mfgNumber;
+        await dw.production.reportGoodParts({ eplantId, workOrderId: woId, goodPartsQty, productionHours, lotNo });
         return {
           workOrderId: woId,
           mfgNumber: cwo.workOrder.mfgNumber,

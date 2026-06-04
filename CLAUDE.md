@@ -36,7 +36,7 @@ Node ≥ 20, TypeScript, Vitest.
 - **2026-06-04: Phase 4 (kaskadna prijava proizvodnje) IMPLEMENTIRANA** (commit `489db8c`),
   čeka živi test korisnika. Klik „Prijavi proizvodnju" na čvoru prijavi taj WO + ceo podstablo,
   od dna ka vrhu, preko DW `ReportProductionByWorkOrder`. Po WO: `WorkOrderEx.ProductionHours`
-  (standard) → ±15% jitter; `goodPartsQty` = puna `Quantity`; `lotNo` prazno (DW auto).
+  (standard) → ±15% jitter; `goodPartsQty` = puna `Quantity`; `lotNo` = broj WO-a (`mfgNumber`).
   Read-only dry-run prema VM-u potvrdio mapiranja na pravim podacima (57 WO za eplant 13).
   Testovi: **backend 90/90, frontend 16/16** zeleno. Frontend build čist; backend `tsc` čist osim
   PRE-POSTOJEĆE pino-http greške.
@@ -50,8 +50,10 @@ Node ≥ 20, TypeScript, Vitest.
 
 - **Živi test Phase 4** (korisnik): na test VM-u kliknuti kaskadu na jednom artiklu, proveriti da
   DW „Report Production By Work Order" prikazuje prijavljene količine i da je vreme variralo ±15%.
-- Otvoreno za dораду posle testa: `lotNo` (sad prazno → DW auto; možda treba pravi lot),
-  opcija „preostala umesto pune količine", živa progresija dok kaskada traje (sad rezime na kraju).
+- **Potvrditi u DW da li roditelj troši lot deteta** (auto-backflush kroz `GoodPartsQuantityDisposition`).
+  Ako NE — dodati eksplicitni `Inventory/Disposition` (`FloorDispoOutCalculated` → `ManualDispositionBackflush`
+  sa `lotNo`). NE raditi naslepo (MES rizik zaliha). Lot proizvedenog = broj WO-a već šaljemo.
+- Otvoreno: opcija „preostala umesto pune količine", živa progresija dok kaskada traje (sad rezime na kraju).
 - Spec: `docs/superpowers/specs/2026-06-04-production-reporting-cascade-design.md`.
   Ako nabavka/prijem ikad zatrebaju nazad — `git revert 4c77771`.
 

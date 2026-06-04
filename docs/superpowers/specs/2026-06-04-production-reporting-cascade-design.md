@@ -26,8 +26,17 @@ Sve preko WebAPI-ja, `AuthToken` header, `{eplantId}` iz sesije.
    `?workOrderId={id}&goodPartsQty={qty}&productionHours={hours}&lotNo={lot}`
    - `goodPartsQty` (decimal, required) = **puna `Quantity` WO-a** (odluka korisnika).
    - `productionHours` (decimal, default 0) = `ProductionHours × (0.85 + rnd×0.30)` — **±15%, po WO**.
-   - `lotNo` (string, opciono „Finished Good Lot Number") = **prazno** (DW sam dodeli).
+   - `lotNo` (string, „Finished Good Lot Number") = **broj radnog naloga (`mfgNumber`)** —
+     lot proizvedene komponente JESTE broj WO-a koji se prijavljuje (pravilo korisnika 2026-06-04).
    - `{eplantId}` u putanji (opciono) = iz sesije.
+
+   **Potrošnja komponenti (lot deteta):** Korisnik: kad roditelj troši dete-komponentu, mora da
+   povuče i lot te komponente. Pošto kaskada ide od dna ka vrhu i svako dete dobije lot = svoj WO
+   broj, roditeljev `GoodPartsQuantityDisposition` (DW „disposition" = prijava + raspolaganje
+   materijalom/backflush) troši baš te lotove. DW ima i poseban `Inventory/Disposition`
+   (`FloorDispoOutCalculated/{woId}`, `ManualDispositionBackflush` sa `lotNo`) za eksplicitnu
+   potrošnju — NE koristimo ga naslepo (rizik dvostruke potrošnje / pogrešnih zaliha za MES);
+   potvrditi u živom testu da li je auto-backflush dovoljan ili treba eksplicitni floor-disposition.
 
 ## Odluke (best-recommendation, bez daljih pitanja korisniku)
 
@@ -37,7 +46,8 @@ Sve preko WebAPI-ja, `AuthToken` header, `{eplantId}` iz sesije.
 | Redosled | od dna ka vrhu (deca pre roditelja) |
 | Količina (`goodPartsQty`) | puna `Quantity` WO-a iz DW |
 | Vreme (`productionHours`) | `ProductionHours` × nasumično `0.85–1.15`, po WO |
-| `lotNo` | prazno (DW auto) |
+| `lotNo` (proizvedeni lot) | broj radnog naloga (`mfgNumber`) |
+| Potrošnja komponenti | oslonac na DW disposition/backflush (bottom-up + WO-lotovi); eksplicitni floor-disposition tek ako živi test pokaže da treba |
 | Više WO na čvoru | prijavi svaki |
 | Kupovni/ciklus čvorovi | preskoči (nemaju WO) |
 | Bezbednost | potvrda pre starta (pravi upisi, puna količina, broj WO); sekvencijalno; auth greška staje, DW greška ne staje (nastavi i zabeleži) |
