@@ -48,11 +48,15 @@ Node ≥ 20, TypeScript, Vitest.
 
 ### Sledeći korak
 
-- **Živi test Phase 4** (korisnik): na test VM-u kliknuti kaskadu na jednom artiklu, proveriti da
-  DW „Report Production By Work Order" prikazuje prijavljene količine i da je vreme variralo ±15%.
-- **Potvrditi u DW da li roditelj troši lot deteta** (auto-backflush kroz `GoodPartsQuantityDisposition`).
-  Ako NE — dodati eksplicitni `Inventory/Disposition` (`FloorDispoOutCalculated` → `ManualDispositionBackflush`
-  sa `lotNo`). NE raditi naslepo (MES rizik zaliha). Lot proizvedenog = broj WO-a već šaljemo.
+- **Živi test Phase 4 (2026-06-04) — uzrok pada razložen, odluka doneta.** Kaskada pada na
+  serijskim komponentama: artikli klase „IN" (potrošni, troše se u delićima, npr. `097327103`)
+  bili su **serijski**, a DW ZABRANJUJE skidanje delića serijskog lota (`FloorDispositionEx` →
+  „Duplicate scan or Partial is disabled!"; auto-backflush → „Insufficient inventory", regular
+  pool 0). To je DW master-data kontradikcija (serijsko + razlomljena količina), ne greška u kodu.
+  **Odluka korisnika: skida serijalizaciju sa tih artikala i radimo STRIKTNO bez serijalizacije.**
+  Aplikacija NE menja kod — čim artikli nisu serijski, auto-backflush prolazi i kaskada ide do kraja.
+- **Po de-serijalizaciji:** ponovo pokrenuti kaskadu (✗ → ✓). Opciono: kontrolna proba na test VM-u
+  da se potvrdi uspešna prijava (jedna prijava = pravi upis u test bazu; minimalna količina).
 - Otvoreno: opcija „preostala umesto pune količine", živa progresija dok kaskada traje (sad rezime na kraju).
 - Spec: `docs/superpowers/specs/2026-06-04-production-reporting-cascade-design.md`.
   Ako nabavka/prijem ikad zatrebaju nazad — `git revert 4c77771`.
@@ -70,6 +74,13 @@ Node ≥ 20, TypeScript, Vitest.
 
 ## Changelog (dopisuj najnovije na vrh)
 
+- **2026-06-04 (Phase 4 živi test)** — Kaskada pada na serijskim komponentama. Razloženo probom
+  test VM-a: artikli klase „IN" (potrošni, razlomljena BOM količina, npr. `097327103`, lot
+  MasterLabelId 136 / serijski 0000114 / 100000 kom / LocId 27029) bili su serijski; DW ne da da
+  se skine delić serijskog lota (`FloorDispositionEx` → „Partial is disabled"; auto-backflush →
+  „Insufficient inventory", regular pool 0). DW master-data kontradikcija (ista klasa kao stara
+  „grupa C"), ne kod. **Odluka: skinuti serijalizaciju, raditi striktno bez nje** — aplikacija bez
+  izmene; čim nije serijsko, auto-backflush prolazi. Sve probe atomarno poništene (ništa upisano).
 - **2026-06-04 (Phase 4)** — Kaskadna prijava proizvodnje, TDD, commit `489db8c`. Otkriven DW
   WebAPI read-only probom test VM-a: `GET WorkOrders/WorkOrderEx/{woId}` → `ProductionHours`;
   `GET ReportProductionByWorkOrder/WorkOrder/{eplant}?workOrderId` → `Quantity`; `POST
