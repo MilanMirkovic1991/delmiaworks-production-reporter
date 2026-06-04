@@ -15,6 +15,23 @@ export function makeError(code: DwErrorCode, message: string, cause?: unknown): 
   return err;
 }
 
+/**
+ * Pulls the human-readable error out of a failed DW response body. DW wraps
+ * server-side errors as { iqmsServiceError: { FriendlyMessage, ExceptionMessage } }.
+ * Returns undefined when the body is not in that shape (e.g. a plain network error),
+ * so the caller can keep the original axios message in that case.
+ */
+export function extractDwFriendlyMessage(data: unknown): string | undefined {
+  if (!data || typeof data !== 'object') return undefined;
+  const svc = (data as Record<string, unknown>).iqmsServiceError;
+  if (!svc || typeof svc !== 'object') return undefined;
+  const o = svc as Record<string, unknown>;
+  const friendly = typeof o.FriendlyMessage === 'string' ? o.FriendlyMessage.trim() : '';
+  const exception = typeof o.ExceptionMessage === 'string' ? o.ExceptionMessage.trim() : '';
+  const msg = friendly || exception;
+  return msg.length > 0 ? msg : undefined;
+}
+
 export function createHttp(baseUrl: string): AxiosInstance {
   const http = axios.create({
     baseURL: baseUrl,
@@ -37,6 +54,12 @@ export function createHttp(baseUrl: string): AxiosInstance {
       logger.error({ url, status, data, code: e.code, message: e.message }, 'dw call failed');
       if (e.code === 'ECONNREFUSED' || e.code === 'ECONNABORTED' || e.code === 'ENOTFOUND') {
         throw makeError('DW_UNREACHABLE', `Cannot reach DelmiaWorks at ${baseUrl}`, e);
+      }
+      // Surface DW's own error text to callers. Appended (not replaced) so the HTTP
+      // status stays in the message — looksLikeAuthError() still detects 401/403.
+      const friendly = extractDwFriendlyMessage(data);
+      if (friendly && !e.message.includes(friendly)) {
+        e.message = `${e.message} — ${friendly}`;
       }
       throw e;
     },
