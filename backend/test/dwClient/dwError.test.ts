@@ -1,5 +1,21 @@
 import { describe, it, expect } from 'vitest';
-import { extractDwFriendlyMessage } from '../../src/dwClient/http.js';
+import { extractDwFriendlyMessage, looksLikeAuthError } from '../../src/dwClient/http.js';
+
+describe('looksLikeAuthError', () => {
+  it('is true for 401/403 axios responses', () => {
+    expect(looksLikeAuthError({ response: { status: 401 } })).toBe(true);
+    expect(looksLikeAuthError({ response: { status: 403 } })).toBe(true);
+  });
+  it('is true when a status is set directly on the error', () => {
+    expect(looksLikeAuthError({ status: 401 })).toBe(true);
+  });
+  it('is false for other statuses and non-errors', () => {
+    expect(looksLikeAuthError({ response: { status: 500 } })).toBe(false);
+    expect(looksLikeAuthError(new Error('boom'))).toBe(false);
+    expect(looksLikeAuthError(undefined)).toBe(false);
+    expect(looksLikeAuthError(null)).toBe(false);
+  });
+});
 
 describe('extractDwFriendlyMessage', () => {
   it('returns FriendlyMessage from an iqmsServiceError payload', () => {

@@ -1,5 +1,26 @@
 import type { Me, Item, SalesOrderRow, Release, BomTreeResponse, SalesOrderSummary, SalesOrderLineItem, WorkOrderRow, WorkOrderTreeResponse, EPlant } from './types.js';
 
+/** Outcome of reporting production for one work order in a cascade. */
+export type CascadeResult = {
+  workOrderId: number;
+  mfgNumber: string;
+  itemNumber: string;
+  arInvtId: number;
+  goodPartsQty: number;
+  productionHours: number;
+  success: boolean;
+  error?: string;
+};
+
+export type CascadeResponse = {
+  total: number;
+  results: CascadeResult[];
+  succeeded: number;
+  failed: number;
+  /** true if the run halted early because the DW session expired. */
+  stoppedOnAuth: boolean;
+};
+
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, { credentials: 'include', ...init });
   if (!res.ok) {
@@ -35,4 +56,10 @@ export const api = {
     req<{ workOrders: WorkOrderRow[] }>(`/api/work-orders?arInvtId=${arInvtId}`),
   workOrderTree: (arInvtId: number, qty: number) =>
     req<WorkOrderTreeResponse>(`/api/work-order-tree?arInvtId=${arInvtId}&qty=${qty}`),
+  reportProductionCascade: (arInvtId: number, qty: number) =>
+    req<CascadeResponse>('/api/production/report-cascade', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ arInvtId, qty }),
+    }),
 };

@@ -16,6 +16,20 @@ export function makeError(code: DwErrorCode, message: string, cause?: unknown): 
 }
 
 /**
+ * True when a thrown error is a DW authentication failure (expired/invalid
+ * session). Used to stop batch operations immediately — every remaining call
+ * would fail the same way. Checks the axios response status (or a status set
+ * directly on the error).
+ */
+export function looksLikeAuthError(e: unknown): boolean {
+  if (!e || typeof e !== 'object') return false;
+  const status =
+    (e as { response?: { status?: number } }).response?.status ??
+    (e as { status?: number }).status;
+  return status === 401 || status === 403;
+}
+
+/**
  * Pulls the human-readable error out of a failed DW response body. DW wraps
  * server-side errors as { iqmsServiceError: { FriendlyMessage, ExceptionMessage } }.
  * Returns undefined when the body is not in that shape (e.g. a plain network error),
